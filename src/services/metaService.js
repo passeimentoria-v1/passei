@@ -31,6 +31,7 @@ export const criarMeta = async (dadosMeta) => {
       observacoes: dadosMeta.observacoes || '',
       concluida: false,
       dataConclusao: null,
+      status: 'Pendente',
       criadoPor: dadosMeta.mentorId,
       dataCriacao: Timestamp.now()
     };
@@ -186,7 +187,8 @@ export const concluirMeta = async (metaId) => {
     
     await updateDoc(metaRef, {
       concluida: true,
-      dataConclusao: Timestamp.now()
+      dataConclusao: Timestamp.now(),
+      status: 'Concluída'
     });
 
     return {
@@ -210,7 +212,8 @@ export const desconcluirMeta = async (metaId) => {
     
     await updateDoc(metaRef, {
       concluida: false,
-      dataConclusao: null
+      dataConclusao: null,
+      status: 'Pendente'
     });
 
     return {
@@ -283,6 +286,30 @@ export const atualizarMeta = async (metaId, dadosAtualizacao) => {
     return {
       sucesso: false,
       erro: 'Erro ao atualizar meta'
+    };
+  }
+};
+
+/**
+ * Atualizar status da meta
+ */
+export const atualizarStatusMeta = async (metaId, novoStatus) => {
+  try {
+    const metaRef = doc(db, 'metas', metaId);
+    
+    await updateDoc(metaRef, {
+      status: novoStatus,
+      dataAtualizacaoStatus: Timestamp.now()
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao atualizar status:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao atualizar status'
     };
   }
 };

@@ -15,6 +15,8 @@ import CriarMetas from './pages/mentor/CriarMetas';
 import Convites from './pages/mentor/Convites';
 import AcompanhamentoAlunos from './pages/mentor/AcompanhamentoAlunos';
 import AlunoDetalhes from './pages/mentor/AlunoDetalhes';
+import DuvidasAlunos from './pages/mentor/DuvidasAlunos';
+import RelatoriosMentor from './pages/mentor/RelatoriosMentor';
 
 // Páginas do Aluno
 import AlunoDashboard from './pages/aluno/Dashboard';
@@ -24,6 +26,8 @@ import Flashcards from './pages/aluno/Flashcards';
 import CriarFlashcard from './pages/aluno/CriarFlashcard';
 import RevisarFlashcards from './pages/aluno/RevisarFlashcards';
 import CalendarioMetas from './pages/aluno/CalendarioMetas';
+import RelatoriosAluno from './pages/aluno/Relatorios';
+
 
 function App() {
   return (
@@ -72,6 +76,22 @@ function App() {
             element={
               <MentorRoute>
                 <UploadEdital />
+              </MentorRoute>
+            }
+          />
+          <Route
+            path="/mentor/relatorios"
+            element={
+              <MentorRoute>
+                <RelatoriosMentor />
+              </MentorRoute>
+            }
+          />
+          <Route
+            path="/mentor/duvidas"
+            element={
+              <MentorRoute>
+                <DuvidasAlunos />
               </MentorRoute>
             }
           />
@@ -130,6 +150,14 @@ function App() {
             element={
               <AlunoRoute>
                 <RegistrarQuestoes />
+              </AlunoRoute>
+            }
+          />
+          <Route
+            path="/aluno/relatorios"
+            element={
+              <AlunoRoute>
+                <RelatoriosAluno />
               </AlunoRoute>
             }
           />
