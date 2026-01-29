@@ -142,9 +142,9 @@ export const Configuracoes = () => {
 
   if (carregando) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Carregando...</p>
         </div>
       </div>
@@ -156,7 +156,7 @@ export const Configuracoes = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
-        <div className="flex items-center gap-4 px-4 py-4 mx-auto max-w-7xl">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
           <button
             onClick={() => navigate(dados?.tipo === 'aluno' ? '/aluno/dashboard' : '/mentor/dashboard')}
             className="text-gray-600 hover:text-gray-800"
@@ -167,41 +167,41 @@ export const Configuracoes = () => {
         </div>
       </header>
 
-      <div className="max-w-4xl px-4 py-8 mx-auto">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {sucesso && (
-          <div className="flex items-center gap-2 p-4 mb-4 text-green-700 border border-green-200 rounded-lg bg-green-50">
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 flex items-center gap-2">
             <span>✓</span>
             <span>{sucesso}</span>
           </div>
         )}
 
         {erro && (
-          <div className="flex items-center gap-2 p-4 mb-4 text-red-600 border border-red-200 rounded-lg bg-red-50">
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 flex items-center gap-2">
             <span>⚠</span>
             <span>{erro}</span>
           </div>
         )}
 
         {/* Card de Perfil Resumido */}
-        <div className="p-6 mb-6 bg-white rounded-lg shadow">
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex items-center gap-6">
             {/* Foto de Perfil */}
             <div className="relative">
-              <div className="flex items-center justify-center w-24 h-24 overflow-hidden rounded-full shadow-lg bg-gradient-to-br from-blue-500 to-purple-600">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
                 {fotoURL ? (
                   <img
                     src={fotoURL}
                     alt="Foto de perfil"
-                    className="object-cover w-full h-full"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-3xl font-bold text-white">{iniciais}</span>
+                  <span className="text-white text-3xl font-bold">{iniciais}</span>
                 )}
               </div>
               
               {uploadando && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
-                  <div className="w-8 h-8 border-b-2 border-white rounded-full animate-spin"></div>
+                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                 </div>
               )}
             </div>
@@ -211,11 +211,11 @@ export const Configuracoes = () => {
               <h2 className="text-2xl font-bold text-gray-800">{nome}</h2>
               <p className="text-gray-600">{dados?.email}</p>
               <div className="flex gap-2 mt-2">
-                <span className="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 rounded-full">
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
                   {dados?.tipo === 'aluno' ? '👨‍🎓 Aluno' : '👨‍🏫 Mentor'}
                 </span>
                 {dados?.cursoNome && (
-                  <span className="px-3 py-1 text-sm font-medium text-purple-700 bg-purple-100 rounded-full">
+                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
                     📚 {dados.cursoNome}
                   </span>
                 )}
@@ -236,7 +236,7 @@ export const Configuracoes = () => {
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span className="mr-2 text-xl">👤</span>
+                <span className="text-xl mr-2">👤</span>
                 Perfil
               </button>
               <button
@@ -247,7 +247,7 @@ export const Configuracoes = () => {
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span className="mr-2 text-xl">🔒</span>
+                <span className="text-xl mr-2">🔒</span>
                 Segurança
               </button>
               <button
@@ -258,7 +258,7 @@ export const Configuracoes = () => {
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span className="mr-2 text-xl">⚙️</span>
+                <span className="text-xl mr-2">⚙️</span>
                 Conta
               </button>
             </div>
@@ -269,18 +269,18 @@ export const Configuracoes = () => {
             <div className="p-6 space-y-6">
               {/* Upload de Foto */}
               <div>
-                <h3 className="mb-4 text-lg font-semibold text-gray-800">Foto de Perfil</h3>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Foto de Perfil</h3>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-20 h-20 overflow-hidden rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                     {fotoURL ? (
-                      <img src={fotoURL} alt="Perfil" className="object-cover w-full h-full" />
+                      <img src={fotoURL} alt="Perfil" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-2xl font-bold text-white">{iniciais}</span>
+                      <span className="text-white text-2xl font-bold">{iniciais}</span>
                     )}
                   </div>
                   
                   <div className="flex gap-3">
-                    <label className="px-4 py-2 text-white transition bg-blue-600 rounded-lg cursor-pointer hover:bg-blue-700">
+                    <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer">
                       <input
                         type="file"
                         accept="image/*"
@@ -295,22 +295,22 @@ export const Configuracoes = () => {
                       <button
                         onClick={handleRemoverFoto}
                         disabled={uploadando}
-                        className="px-4 py-2 text-white transition bg-red-600 rounded-lg hover:bg-red-700"
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                       >
                         🗑️ Remover
                       </button>
                     )}
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">JPG, PNG ou WEBP. Máximo 5MB.</p>
+                <p className="text-xs text-gray-500 mt-2">JPG, PNG ou WEBP. Máximo 5MB.</p>
               </div>
 
               {/* Formulário Nome */}
               <div>
-                <h3 className="mb-4 text-lg font-semibold text-gray-800">Informações Pessoais</h3>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Informações Pessoais</h3>
                 <form onSubmit={handleSalvarNome} className="space-y-4">
                   <div>
-                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Nome Completo
                     </label>
                     <input
@@ -318,31 +318,31 @@ export const Configuracoes = () => {
                       value={nome}
                       onChange={(e) => setNome(e.target.value)}
                       required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       E-mail
                     </label>
                     <input
                       type="email"
                       value={dados?.email}
                       disabled
-                      className="w-full px-4 py-2 text-gray-600 bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
                     />
-                    <p className="mt-1 text-xs text-gray-500">O e-mail não pode ser alterado</p>
+                    <p className="text-xs text-gray-500 mt-1">O e-mail não pode ser alterado</p>
                   </div>
 
                   {dados?.tipo === 'aluno' && (
                     <>
                       {dados.cursoNome && (
                         <div>
-                          <label className="block mb-2 text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Curso Vinculado
                           </label>
-                          <div className="w-full px-4 py-2 font-medium text-blue-700 border border-blue-300 rounded-lg bg-blue-50">
+                          <div className="w-full px-4 py-2 border border-blue-300 rounded-lg bg-blue-50 text-blue-700 font-medium">
                             📚 {dados.cursoNome}
                           </div>
                         </div>
@@ -350,10 +350,10 @@ export const Configuracoes = () => {
 
                       {dados.mentorNome && (
                         <div>
-                          <label className="block mb-2 text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Mentor
                           </label>
-                          <div className="w-full px-4 py-2 font-medium text-purple-700 border border-purple-300 rounded-lg bg-purple-50">
+                          <div className="w-full px-4 py-2 border border-purple-300 rounded-lg bg-purple-50 text-purple-700 font-medium">
                             👨‍🏫 {dados.mentorNome}
                           </div>
                         </div>
@@ -364,7 +364,7 @@ export const Configuracoes = () => {
                   <button
                     type="submit"
                     disabled={salvando}
-                    className="w-full py-3 font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
                   >
                     {salvando ? 'Salvando...' : '💾 Salvar Alterações'}
                   </button>
@@ -376,11 +376,11 @@ export const Configuracoes = () => {
           {/* CONTEÚDO - SEGURANÇA */}
           {abaAtiva === 'seguranca' && (
             <div className="p-6">
-              <h3 className="mb-4 text-lg font-semibold text-gray-800">Alterar Senha</h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Alterar Senha</h3>
               
               <form onSubmit={handleAlterarSenha} className="space-y-4">
                 <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Senha Atual
                   </label>
                   <input
@@ -388,13 +388,13 @@ export const Configuracoes = () => {
                     value={senhaAtual}
                     onChange={(e) => setSenhaAtual(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Digite sua senha atual"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Nova Senha
                   </label>
                   <input
@@ -403,13 +403,13 @@ export const Configuracoes = () => {
                     onChange={(e) => setNovaSenha(e.target.value)}
                     required
                     minLength={6}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Mínimo 6 caracteres"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Confirmar Nova Senha
                   </label>
                   <input
@@ -418,7 +418,7 @@ export const Configuracoes = () => {
                     onChange={(e) => setConfirmarSenha(e.target.value)}
                     required
                     minLength={6}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Digite novamente"
                   />
                 </div>
@@ -426,13 +426,13 @@ export const Configuracoes = () => {
                 <button
                   type="submit"
                   disabled={salvando}
-                  className="w-full py-3 font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
                 >
                   {salvando ? 'Alterando...' : '🔑 Alterar Senha'}
                 </button>
               </form>
 
-              <div className="p-4 mt-6 border border-yellow-200 rounded-lg bg-yellow-50">
+              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
                   💡 <strong>Dica:</strong> Use uma senha forte com letras, números e símbolos.
                 </p>
@@ -445,19 +445,19 @@ export const Configuracoes = () => {
             <div className="p-6 space-y-6">
               {/* Informações */}
               <div>
-                <h3 className="mb-4 text-lg font-semibold text-gray-800">Informações da Conta</h3>
-                <div className="p-4 space-y-3 rounded-lg bg-gray-50">
-                  <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Informações da Conta</h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">Tipo de Conta:</span>
                     <span className="font-medium text-gray-800">
                       {dados?.tipo === 'aluno' ? '👨‍🎓 Aluno' : '👨‍🏫 Mentor'}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">ID do Usuário:</span>
                     <span className="font-mono text-xs text-gray-600">{usuario.uid}</span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">Membro desde:</span>
                     <span className="text-gray-800">
                       {dados?.dataCriacao ? new Date(dados.dataCriacao.toDate()).toLocaleDateString('pt-BR') : '-'}
@@ -468,25 +468,25 @@ export const Configuracoes = () => {
 
               {/* Logout */}
               <div>
-                <h3 className="mb-4 text-lg font-semibold text-gray-800">Sessão</h3>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Sessão</h3>
                 <button
                   onClick={handleLogout}
-                  className="w-full py-3 font-semibold text-white transition bg-red-600 rounded-lg hover:bg-red-700"
+                  className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition"
                 >
                   🚪 Sair da Conta
                 </button>
               </div>
 
               {/* Zona de Perigo */}
-              <div className="pt-6 border-t border-gray-200">
-                <h3 className="mb-4 text-lg font-semibold text-red-600">⚠️ Zona de Perigo</h3>
-                <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                  <p className="mb-3 text-sm text-red-700">
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-red-600 mb-4">⚠️ Zona de Perigo</h3>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-700 mb-3">
                     Esta ação é irreversível e apagará todos os seus dados permanentemente.
                   </p>
                   <button
                     onClick={() => alert('Funcionalidade em desenvolvimento. Entre em contato com o suporte para excluir sua conta.')}
-                    className="px-4 py-2 text-white transition bg-red-600 rounded-lg hover:bg-red-700"
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                   >
                     🗑️ Excluir Conta
                   </button>

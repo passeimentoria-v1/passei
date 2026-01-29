@@ -27,6 +27,7 @@ import CriarFlashcard from './pages/aluno/CriarFlashcard';
 import RevisarFlashcards from './pages/aluno/RevisarFlashcards';
 import CalendarioMetas from './pages/aluno/CalendarioMetas';
 import RelatoriosAluno from './pages/aluno/Relatorios';
+import Configuracoes from './pages/aluno/Configuracoes';
 
 
 function App() {
@@ -160,6 +161,13 @@ function App() {
                 <RelatoriosAluno />
               </AlunoRoute>
             }
+          />
+          <Route 
+            path="/aluno/configuracoes" 
+            element={
+              <AlunoRoute>
+                <Configuracoes />
+              </AlunoRoute>} 
           />
           <Route
             path="/aluno/calendario"

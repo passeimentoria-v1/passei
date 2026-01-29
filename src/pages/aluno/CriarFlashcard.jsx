@@ -6,18 +6,18 @@ import {
   buscarDisciplinasCurso,
   buscarAssuntosDisciplina 
 } from '../../services/questoesService';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase.config';
 
 export const CriarFlashcard = () => {
   const navigate = useNavigate();
   const { usuario } = useAuth();
 
-  const [cursos, setCursos] = useState([]);
+  const [cursoId, setCursoId] = useState('');
+  const [cursoNome, setCursoNome] = useState('');
   const [disciplinas, setDisciplinas] = useState([]);
   const [assuntos, setAssuntos] = useState([]);
 
-  const [cursoSelecionado, setCursoSelecionado] = useState('');
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState('');
   const [assuntoSelecionado, setAssuntoSelecionado] = useState('');
 
@@ -26,41 +26,48 @@ export const CriarFlashcard = () => {
   const [dica, setDica] = useState('');
 
   const [carregando, setCarregando] = useState(false);
+  const [carregandoDados, setCarregandoDados] = useState(true);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
 
   useEffect(() => {
-    carregarCursos();
+    carregarCursoDoAluno();
   }, []);
 
-  const carregarCursos = async () => {
+  const carregarCursoDoAluno = async () => {
     try {
-      const cursosRef = collection(db, 'cursos');
-      const q = query(cursosRef, where('ativo', '==', true));
-      const snapshot = await getDocs(q);
-
-      const lista = [];
-      snapshot.forEach((doc) => {
-        lista.push({ id: doc.id, ...doc.data() });
-      });
-
-      setCursos(lista);
-    } catch (error) {
-      console.error('Erro ao carregar cursos:', error);
-    }
-  };
-
-  const handleSelecionarCurso = async (cursoId) => {
-    setCursoSelecionado(cursoId);
-    setDisciplinaSelecionada('');
-    setAssuntoSelecionado('');
-    setAssuntos([]);
-
-    if (cursoId) {
-      const resultado = await buscarDisciplinasCurso(cursoId);
-      if (resultado.sucesso) {
-        setDisciplinas(resultado.disciplinas);
+      setCarregandoDados(true);
+      
+      // Buscar dados do usuário
+      const userDoc = await getDoc(doc(db, 'users', usuario.uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        if (userData.cursoId) {
+          // Se o usuário tem um curso associado
+          setCursoId(userData.cursoId);
+          
+          // Buscar nome do curso
+          const cursoDoc = await getDoc(doc(db, 'cursos', userData.cursoId));
+          if (cursoDoc.exists()) {
+            setCursoNome(cursoDoc.data().nome);
+          }
+          
+          // Carregar disciplinas do curso
+          const resultado = await buscarDisciplinasCurso(userData.cursoId);
+          if (resultado.sucesso) {
+            setDisciplinas(resultado.disciplinas);
+          }
+        } else {
+          setErro('Você ainda não está matriculado em nenhum curso. Entre em contato com seu mentor.');
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar curso do aluno:', error);
+      setErro('Erro ao carregar informações do curso.');
+    } finally {
+      setCarregandoDados(false);
     }
   };
 
@@ -69,7 +76,7 @@ export const CriarFlashcard = () => {
     setAssuntoSelecionado('');
 
     if (disciplinaId) {
-      const resultado = await buscarAssuntosDisciplina(cursoSelecionado, disciplinaId);
+      const resultado = await buscarAssuntosDisciplina(cursoId, disciplinaId);
       if (resultado.sucesso) {
         setAssuntos(resultado.assuntos);
       }
@@ -93,7 +100,8 @@ export const CriarFlashcard = () => {
     const dadosFlashcard = {
       criadoPor: usuario.uid,
       tipoUsuario: 'aluno',
-      cursoId: cursoSelecionado,
+      alunoId: usuario.uid,
+      cursoId: cursoId,
       disciplinaId: disciplinaSelecionada,
       disciplinaNome: disciplina?.nome || '',
       assuntoId: assuntoSelecionado,
@@ -120,6 +128,17 @@ export const CriarFlashcard = () => {
 
     setCarregando(false);
   };
+
+  if (carregandoDados) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -148,28 +167,17 @@ export const CriarFlashcard = () => {
           </div>
         )}
 
+        {/* Info do Curso */}
+        {cursoNome && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-600">
+              📚 <strong>Curso:</strong> {cursoNome}
+            </p>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Selecionar Curso */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Curso/Edital *
-              </label>
-              <select
-                value={cursoSelecionado}
-                onChange={(e) => handleSelecionarCurso(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="">Selecione um curso</option>
-                {cursos.map(curso => (
-                  <option key={curso.id} value={curso.id}>
-                    {curso.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Selecionar Disciplina */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -179,7 +187,7 @@ export const CriarFlashcard = () => {
                 value={disciplinaSelecionada}
                 onChange={(e) => handleSelecionarDisciplina(e.target.value)}
                 required
-                disabled={!cursoSelecionado}
+                disabled={!cursoId}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"
               >
                 <option value="">Selecione uma disciplina</option>
@@ -279,7 +287,7 @@ export const CriarFlashcard = () => {
             {/* Botão Criar */}
             <button
               type="submit"
-              disabled={carregando}
+              disabled={carregando || !cursoId}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {carregando ? 'Criando...' : 'Criar Flashcard'}

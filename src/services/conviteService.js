@@ -1,60 +1,15 @@
 import { 
   collection, 
-  addDoc, 
   doc, 
-  getDoc,
-  updateDoc,
-  query,
-  where,
+  getDoc, 
   getDocs,
-  Timestamp 
+  updateDoc, 
+  query, 
+  where,
+  Timestamp,
+  addDoc 
 } from 'firebase/firestore';
 import { db } from '../firebase.config';
-
-/**
- * Gerar código único de convite
- */
-const gerarCodigoConvite = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let codigo = '';
-  for (let i = 0; i < 8; i++) {
-    codigo += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return codigo;
-};
-
-/**
- * Criar convite de mentor
- */
-export const criarConvite = async (mentorId, mentorNome) => {
-  try {
-    const codigo = gerarCodigoConvite();
-    
-    const convitesRef = collection(db, 'convites');
-    const conviteData = {
-      codigo,
-      mentorId,
-      mentorNome,
-      dataCriacao: Timestamp.now(),
-      ativo: true,
-      usosRestantes: 50 // Limite de usos
-    };
-
-    const docRef = await addDoc(convitesRef, conviteData);
-
-    return {
-      sucesso: true,
-      codigo,
-      conviteId: docRef.id
-    };
-  } catch (error) {
-    console.error('Erro ao criar convite:', error);
-    return {
-      sucesso: false,
-      erro: 'Erro ao criar convite'
-    };
-  }
-};
 
 /**
  * Validar código de convite
@@ -73,78 +28,116 @@ export const validarConvite = async (codigo) => {
     if (snapshot.empty) {
       return {
         valido: false,
-        erro: 'Código de convite inválido ou expirado'
+        mensagem: 'Código de convite inválido ou já utilizado'
       };
     }
 
-    const convite = snapshot.docs[0];
-    const conviteData = convite.data();
-
-    if (conviteData.usosRestantes <= 0) {
-      return {
-        valido: false,
-        erro: 'Este convite atingiu o limite de usos'
-      };
-    }
+    const conviteDoc = snapshot.docs[0];
+    const convite = { id: conviteDoc.id, ...conviteDoc.data() };
 
     return {
       valido: true,
-      conviteId: convite.id,
-      mentorId: conviteData.mentorId,
-      mentorNome: conviteData.mentorNome
+      convite
     };
   } catch (error) {
     console.error('Erro ao validar convite:', error);
     return {
       valido: false,
-      erro: 'Erro ao validar convite'
+      mensagem: 'Erro ao validar convite'
     };
   }
 };
 
 /**
- * Usar convite (decrementar usos)
+ * Aceitar convite e associar aluno ao mentor
  */
-export const usarConvite = async (conviteId) => {
+export const aceitarConvite = async (alunoId, conviteId, mentorId, cursoId) => {
   try {
-    const conviteRef = doc(db, 'convites', conviteId);
-    const conviteSnap = await getDoc(conviteRef);
-
-    if (!conviteSnap.exists()) {
-      return { sucesso: false };
-    }
-
-    const usosRestantes = conviteSnap.data().usosRestantes;
-
-    await updateDoc(conviteRef, {
-      usosRestantes: usosRestantes - 1,
-      ultimoUso: Timestamp.now()
+    // Atualizar dados do aluno
+    const alunoRef = doc(db, 'users', alunoId);
+    await updateDoc(alunoRef, {
+      mentorId: mentorId,
+      cursoId: cursoId, // NOVO: Associar curso ao aluno
+      dataVinculo: Timestamp.now()
     });
 
-    return { sucesso: true };
+    // Desativar convite
+    const conviteRef = doc(db, 'convites', conviteId);
+    await updateDoc(conviteRef, {
+      ativo: false,
+      dataUtilizado: Timestamp.now(),
+      utilizadoPor: alunoId
+    });
+
+    return {
+      sucesso: true
+    };
   } catch (error) {
-    console.error('Erro ao usar convite:', error);
-    return { sucesso: false };
+    console.error('Erro ao aceitar convite:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao aceitar convite'
+    };
   }
 };
 
 /**
- * Buscar convites de um mentor
+ * Criar código de convite
+ */
+export const criarConvite = async (mentorId, cursoId) => {
+  try {
+    const codigo = gerarCodigoAleatorio();
+
+    const conviteData = {
+      codigo,
+      mentorId,
+      cursoId, // NOVO: Associar curso ao convite
+      ativo: true,
+      dataCriacao: Timestamp.now(),
+      utilizadoPor: null,
+      dataUtilizado: null
+    };
+
+    const conviteRef = await addDoc(collection(db, 'convites'), conviteData);
+
+    return {
+      sucesso: true,
+      codigo,
+      conviteId: conviteRef.id
+    };
+  } catch (error) {
+    console.error('Erro ao criar convite:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao criar convite'
+    };
+  }
+};
+
+/**
+ * Buscar convites do mentor
  */
 export const buscarConvitesMentor = async (mentorId) => {
   try {
     const convitesRef = collection(db, 'convites');
-    const q = query(
-      convitesRef,
-      where('mentorId', '==', mentorId),
-      where('ativo', '==', true)
-    );
-
+    const q = query(convitesRef, where('mentorId', '==', mentorId));
     const snapshot = await getDocs(q);
-    const convites = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+
+    const convites = [];
+    for (const conviteDoc of snapshot.docs) {
+      const conviteData = { id: conviteDoc.id, ...conviteDoc.data() };
+      
+      // Buscar nome do curso se houver
+      if (conviteData.cursoId) {
+        const cursoRef = doc(db, 'cursos', conviteData.cursoId);
+        const cursoDoc = await getDoc(cursoRef);
+        if (cursoDoc.exists()) {
+          conviteData.cursoNome = cursoDoc.data().nome;
+        }
+      }
+      
+      convites.push(conviteData);
+    }
 
     return {
       sucesso: true,
@@ -154,8 +147,8 @@ export const buscarConvitesMentor = async (mentorId) => {
     console.error('Erro ao buscar convites:', error);
     return {
       sucesso: false,
-      convites: [],
-      erro: 'Erro ao buscar convites'
+      erro: 'Erro ao buscar convites',
+      convites: []
     };
   }
 };
@@ -170,9 +163,26 @@ export const desativarConvite = async (conviteId) => {
       ativo: false
     });
 
-    return { sucesso: true };
+    return {
+      sucesso: true
+    };
   } catch (error) {
     console.error('Erro ao desativar convite:', error);
-    return { sucesso: false };
+    return {
+      sucesso: false,
+      erro: 'Erro ao desativar convite'
+    };
   }
+};
+
+/**
+ * Gerar código aleatório
+ */
+const gerarCodigoAleatorio = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let codigo = '';
+  for (let i = 0; i < 8; i++) {
+    codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return codigo;
 };
