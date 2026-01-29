@@ -25,9 +25,10 @@ import HistoricoQuestoes from './pages/aluno/HistoricoQuestoes';
 import Flashcards from './pages/aluno/Flashcards';
 import CriarFlashcard from './pages/aluno/CriarFlashcard';
 import RevisarFlashcards from './pages/aluno/RevisarFlashcards';
-import CalendarioMetas from './pages/aluno/CalendarioMetas';
 import RelatoriosAluno from './pages/aluno/Relatorios';
 import Configuracoes from './pages/aluno/Configuracoes';
+import ReprogramarMetas from './pages/aluno/ReprogramarMetas';
+import MinhasMetas from './pages/aluno/MinhasMetas';
 
 
 function App() {
@@ -154,6 +155,20 @@ function App() {
               </AlunoRoute>
             }
           />
+          <Route 
+          path="/aluno/metas" 
+          element={
+            <AlunoRoute>
+              <MinhasMetas />
+              </AlunoRoute>} 
+          />
+          <Route 
+          path="/aluno/reprogramar-metas" 
+          element={
+            <AlunoRoute>
+              <ReprogramarMetas />
+            </AlunoRoute>} 
+            />
           <Route
             path="/aluno/relatorios"
             element={
@@ -168,14 +183,6 @@ function App() {
               <AlunoRoute>
                 <Configuracoes />
               </AlunoRoute>} 
-          />
-          <Route
-            path="/aluno/calendario"
-            element={
-              <AlunoRoute>
-                <CalendarioMetas />
-              </AlunoRoute>
-            }
           />
           <Route
             path="/aluno/flashcards"

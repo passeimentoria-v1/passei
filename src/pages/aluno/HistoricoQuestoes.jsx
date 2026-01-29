@@ -4,8 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
   buscarRegistrosAluno,
   calcularEstatisticasQuestoes,
-  deletarRegistro
-} from '../../services/questoesService';
+  } from '../../services/questoesService';
 
 export const HistoricoQuestoes = () => {
   const navigate = useNavigate();
@@ -38,15 +37,6 @@ export const HistoricoQuestoes = () => {
     setCarregando(false);
   };
 
-  const handleDeletar = async (registroId) => {
-    if (confirm('Deseja realmente deletar este registro?')) {
-      const resultado = await deletarRegistro(registroId);
-      if (resultado.sucesso) {
-        carregarRegistros();
-      }
-    }
-  };
-
   const formatarData = (timestamp) => {
     if (!timestamp) return '';
     const data = timestamp.toDate();
@@ -68,7 +58,7 @@ export const HistoricoQuestoes = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center justify-between px-4 py-4 mx-auto max-w-7xl">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/aluno/dashboard')}
@@ -80,32 +70,32 @@ export const HistoricoQuestoes = () => {
           </div>
           <button
             onClick={() => navigate('/aluno/registrar-questoes')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="px-4 py-2 text-white transition bg-blue-600 rounded-lg hover:bg-blue-700"
           >
             + Registrar
           </button>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="px-4 py-8 mx-auto max-w-7xl">
         {/* Cards de Estatísticas */}
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
+        <div className="grid gap-4 mb-6 md:grid-cols-4">
+          <div className="p-4 bg-white rounded-lg shadow">
             <p className="text-sm text-gray-600">Total de Questões</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">{stats.totalQuestoes}</p>
+            <p className="mt-1 text-3xl font-bold text-gray-800">{stats.totalQuestoes}</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="p-4 bg-white rounded-lg shadow">
             <p className="text-sm text-gray-600">Acertos</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">{stats.totalAcertos}</p>
+            <p className="mt-1 text-3xl font-bold text-green-600">{stats.totalAcertos}</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="p-4 bg-white rounded-lg shadow">
             <p className="text-sm text-gray-600">Erros</p>
-            <p className="text-3xl font-bold text-red-600 mt-1">{stats.totalErros}</p>
+            <p className="mt-1 text-3xl font-bold text-red-600">{stats.totalErros}</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="p-4 bg-white rounded-lg shadow">
             <p className="text-sm text-gray-600">Média de Acerto</p>
             <p className={`text-3xl font-bold mt-1 ${getCorPercentual(stats.mediaAcerto)}`}>
               {stats.mediaAcerto}%
@@ -115,8 +105,8 @@ export const HistoricoQuestoes = () => {
 
         {/* Desempenho por Disciplina */}
         {stats.porDisciplina && Object.keys(stats.porDisciplina).length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Desempenho por Disciplina</h2>
+          <div className="p-6 mb-6 bg-white rounded-lg shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-800">Desempenho por Disciplina</h2>
             <div className="space-y-3">
               {Object.entries(stats.porDisciplina).map(([disciplina, dados]) => {
                 const percentual = dados.total > 0 
@@ -124,7 +114,7 @@ export const HistoricoQuestoes = () => {
                   : 0;
                 
                 return (
-                  <div key={disciplina} className="border-b border-gray-200 pb-3 last:border-0">
+                  <div key={disciplina} className="pb-3 border-b border-gray-200 last:border-0">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-800">{disciplina}</span>
                       <span className={`font-bold ${getCorPercentual(percentual)}`}>
@@ -136,7 +126,7 @@ export const HistoricoQuestoes = () => {
                       <span className="text-green-600">✓ {dados.acertos}</span>
                       <span className="text-red-600">✗ {dados.erros}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div className="w-full h-2 mt-2 bg-gray-200 rounded-full">
                       <div
                         className={`h-2 rounded-full ${
                           percentual >= 70 ? 'bg-green-500' :
@@ -162,16 +152,16 @@ export const HistoricoQuestoes = () => {
 
           <div className="p-6">
             {carregando ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
                 <p className="mt-4 text-gray-600">Carregando registros...</p>
               </div>
             ) : registros.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600 mb-4">Nenhum registro encontrado</p>
+              <div className="py-8 text-center">
+                <p className="mb-4 text-gray-600">Nenhum registro encontrado</p>
                 <button
                   onClick={() => navigate('/aluno/registrar-questoes')}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  className="px-6 py-2 text-white transition bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
                   Fazer Primeiro Registro
                 </button>
@@ -181,7 +171,7 @@ export const HistoricoQuestoes = () => {
                 {registros.map(registro => (
                   <div
                     key={registro.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                    className="p-4 transition border border-gray-200 rounded-lg hover:shadow-md"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -199,35 +189,28 @@ export const HistoricoQuestoes = () => {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-4 text-sm mb-2">
+                        <div className="flex items-center gap-4 mb-2 text-sm">
                           <span className="text-gray-600">
                             📊 {registro.totalQuestoes} questões
                           </span>
-                          <span className="text-green-600 font-medium">
+                          <span className="font-medium text-green-600">
                             ✓ {registro.acertos} acertos
                           </span>
-                          <span className="text-red-600 font-medium">
+                          <span className="font-medium text-red-600">
                             ✗ {registro.erros} erros
                           </span>
                         </div>
 
                         {registro.observacoes && (
-                          <p className="text-sm text-gray-600 mt-2 italic">
+                          <p className="mt-2 text-sm italic text-gray-600">
                             "{registro.observacoes}"
                           </p>
                         )}
 
-                        <p className="text-xs text-gray-400 mt-2">
+                        <p className="mt-2 text-xs text-gray-400">
                           {formatarData(registro.dataRegistro)}
                         </p>
                       </div>
-
-                      <button
-                        onClick={() => handleDeletar(registro.id)}
-                        className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded transition text-sm"
-                      >
-                        🗑️ Deletar
-                      </button>
                     </div>
                   </div>
                 ))}

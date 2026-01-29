@@ -35,34 +35,34 @@ export const RecuperarSenha = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-blue-600 mb-2">Passei</h1>
+    <div className="flex items-center justify-center min-h-screen px-4 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <h1 className="mb-2 text-5xl font-bold text-blue-600">Passar</h1>
           <p className="text-gray-600">Plataforma de Mentoria para Concursos</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Recuperar Senha</h2>
-          <p className="text-gray-600 mb-6">
+        <div className="p-8 bg-white shadow-xl rounded-2xl">
+          <h2 className="mb-2 text-2xl font-bold text-gray-800">Recuperar Senha</h2>
+          <p className="mb-6 text-gray-600">
             Digite seu email e enviaremos um link para redefinir sua senha
           </p>
 
           {mensagem && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            <div className="p-3 mb-4 text-sm text-green-700 border border-green-200 rounded-lg bg-green-50">
               {mensagem}
             </div>
           )}
 
           {erro && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div className="p-3 mb-4 text-sm text-red-600 border border-red-200 rounded-lg bg-red-50">
               {erro}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block mb-1 text-sm font-medium text-gray-700">
                 Email
               </label>
               <input
@@ -76,7 +76,7 @@ export const RecuperarSenha = () => {
                   setErro('');
                   setMensagem('');
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className="w-full px-4 py-2 transition border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="seu@email.com"
               />
             </div>
@@ -84,22 +84,22 @@ export const RecuperarSenha = () => {
             <button
               type="submit"
               disabled={carregando}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed"
+              className="w-full py-3 font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
             >
               {carregando ? 'Enviando...' : 'Enviar Link de Recuperação'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
+          <div className="mt-6 text-sm text-center text-gray-600">
             Lembrou a senha?{' '}
-            <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
+            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700">
               Fazer login
             </Link>
           </div>
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          © 2025 Passei. Todos os direitos reservados.
+        <p className="mt-6 text-sm text-center text-gray-500">
+          © 2025 Passar. Todos os direitos reservados.
         </p>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   buscarMetasAluno, 
@@ -133,7 +133,7 @@ export const AlunoDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
-        <div className="flex items-center justify-between py-4 mx-auto max-w-7xl px-4">
+        <div className="flex items-center justify-between px-4 py-4 mx-auto max-w-7xl">
           {/* ESQUERDA */}
           <div>
             <h1 className="text-2xl font-bold text-blue-600">Passar - Aluno</h1>
@@ -180,14 +180,7 @@ export const AlunoDashboard = () => {
             <span>📊</span>
             <span>Ver Histórico</span>
           </button>
-          <button
-            onClick={() => navigate('/aluno/calendario')}
-            className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-white transition bg-teal-600 rounded-lg hover:bg-teal-700"
-          >
-            <span>📅</span>
-            <span>Calendário</span>
-          </button>
-          <button
+         <button
             onClick={() => navigate('/aluno/flashcards')}
             className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-white transition bg-indigo-600 rounded-lg hover:bg-indigo-700"
           >
@@ -201,6 +194,13 @@ export const AlunoDashboard = () => {
             <span>📊</span>
             <span>Ver Relatórios</span>
           </button>
+          <Link
+            to="/aluno/metas"
+            className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-white transition bg-purple-600 rounded-lg hover:bg-purple-700"
+          >
+            <span>🎯</span>
+            <span>Minhas Metas</span>
+          </Link>
           {statsFlashcards.paraRevisar > 0 && (
             <button
               onClick={() => navigate('/aluno/flashcards/revisar')}

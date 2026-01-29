@@ -252,6 +252,30 @@ export const reagendarMeta = async (metaId, novaData) => {
 };
 
 /**
+ * Reprogramar meta atrasada (NOVA FUNCIONALIDADE)
+ */
+export const reprogramarMeta = async (metaId, novaData) => {
+  try {
+    const metaRef = doc(db, 'metas', metaId);
+    
+    await updateDoc(metaRef, {
+      dataProgramada: Timestamp.fromDate(new Date(novaData)),
+      dataReprogramacao: Timestamp.now()
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao reprogramar meta:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao reprogramar meta'
+    };
+  }
+};
+
+/**
  * Atualizar meta completa
  */
 export const atualizarMeta = async (metaId, dadosAtualizacao) => {
@@ -425,6 +449,51 @@ export const buscarEstatisticasPorPeriodo = async (alunoId, dataInicio, dataFim)
     return {
       sucesso: false,
       erro: 'Erro ao buscar estatísticas'
+    };
+  }
+};
+
+/**
+ * Buscar metas atrasadas de um aluno (NOVA FUNCIONALIDADE)
+ */
+export const buscarMetasAtrasadas = async (alunoId) => {
+  try {
+    const metasRef = collection(db, 'metas');
+    const q = query(
+      metasRef, 
+      where('alunoId', '==', alunoId),
+      where('concluida', '==', false)
+    );
+    
+    const snapshot = await getDocs(q);
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const metasAtrasadas = [];
+    snapshot.forEach((doc) => {
+      const meta = { id: doc.id, ...doc.data() };
+      
+      if (meta.dataProgramada) {
+        const dataProgramada = meta.dataProgramada.toDate();
+        dataProgramada.setHours(0, 0, 0, 0);
+        
+        if (dataProgramada < hoje) {
+          metasAtrasadas.push(meta);
+        }
+      }
+    });
+
+    return {
+      sucesso: true,
+      metas: metasAtrasadas
+    };
+  } catch (error) {
+    console.error('Erro ao buscar metas atrasadas:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao carregar metas atrasadas',
+      metas: []
     };
   }
 };

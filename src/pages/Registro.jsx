@@ -88,23 +88,23 @@ export const Registro = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-blue-600">Passei</h1>
-          <p className="text-gray-600 mt-2">Cadastro de Aluno</p>
+    <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-500 to-purple-600">
+      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-xl">
+        <div className="mb-6 text-center">
+          <h1 className="text-3xl font-bold text-blue-600">Passar</h1>
+          <p className="mt-2 text-gray-600">Cadastro de Aluno</p>
         </div>
 
         {erro && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="p-3 mb-4 text-sm text-red-600 border border-red-200 rounded-lg bg-red-50">
             {erro}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Código de Convite */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="p-3 border border-blue-200 rounded-lg bg-blue-50">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Código de Convite *
             </label>
             <input
@@ -113,7 +113,7 @@ export const Registro = () => {
               onChange={(e) => setCodigoConvite(e.target.value.toUpperCase())}
               required
               maxLength={8}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono uppercase"
+              className="w-full px-4 py-2 font-mono uppercase border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="XXXXXXXX"
             />
             <p className="mt-1 text-xs text-blue-600">
@@ -123,7 +123,7 @@ export const Registro = () => {
 
           {/* Nome */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Nome Completo
             </label>
             <input
@@ -131,14 +131,14 @@ export const Registro = () => {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Seu nome completo"
             />
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               E-mail
             </label>
             <input
@@ -146,14 +146,14 @@ export const Registro = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="seu@email.com"
             />
           </div>
 
           {/* Senha */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Senha
             </label>
             <input
@@ -162,14 +162,14 @@ export const Registro = () => {
               onChange={(e) => setSenha(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Mínimo 6 caracteres"
             />
           </div>
 
           {/* Confirmar Senha */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Confirmar Senha
             </label>
             <input
@@ -178,7 +178,7 @@ export const Registro = () => {
               onChange={(e) => setConfirmarSenha(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Confirme sua senha"
             />
           </div>
@@ -187,7 +187,7 @@ export const Registro = () => {
           <button
             type="submit"
             disabled={carregando}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full py-3 font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {carregando ? 'Criando conta...' : 'Criar Conta'}
           </button>
@@ -199,7 +199,7 @@ export const Registro = () => {
             Já tem uma conta?{' '}
             <button
               onClick={() => navigate('/login')}
-              className="text-blue-600 font-semibold hover:underline"
+              className="font-semibold text-blue-600 hover:underline"
             >
               Faça login
             </button>
