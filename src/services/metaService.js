@@ -19,13 +19,18 @@ export const criarMeta = async (dadosMeta) => {
   try {
     const metasRef = collection(db, 'metas');
     
+    // Criar data corretamente sem problemas de timezone
+    // Se vier no formato "2026-01-31", parseia e cria a data ao meio-dia
+    const [ano, mes, dia] = dadosMeta.dataProgramada.split("-");
+    const dataProgramada = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia), 12, 0, 0);
+
     const metaData = {
       alunoId: dadosMeta.alunoId,
       cursoId: dadosMeta.cursoId,
       disciplinaId: dadosMeta.disciplinaId,
       assuntoId: dadosMeta.assuntoId,
       assuntoTitulo: dadosMeta.assuntoTitulo,
-      dataProgramada: Timestamp.fromDate(new Date(dadosMeta.dataProgramada)),
+      dataProgramada: Timestamp.fromDate(dataProgramada),
       tipoEstudo: dadosMeta.tipoEstudo || 'regular',
       tempoEstimado: dadosMeta.tempoEstimado || 0,
       observacoes: dadosMeta.observacoes || '',
@@ -236,7 +241,7 @@ export const reagendarMeta = async (metaId, novaData) => {
     const metaRef = doc(db, 'metas', metaId);
     
     await updateDoc(metaRef, {
-      dataProgramada: Timestamp.fromDate(novaData)
+      dataProgramada: Timestamp.fromDate(dataProgramada),
     });
 
     return {
@@ -259,7 +264,7 @@ export const reprogramarMeta = async (metaId, novaData) => {
     const metaRef = doc(db, 'metas', metaId);
     
     await updateDoc(metaRef, {
-      dataProgramada: Timestamp.fromDate(new Date(novaData)),
+      dataProgramada: Timestamp.fromDate(dataProgramada),
       dataReprogramacao: Timestamp.now()
     });
 

@@ -632,7 +632,7 @@ export const MinhasMetas = () => {
                     <div>
                       <p className="text-sm text-gray-600">Tempo Estimado</p>
                       <p className="text-lg font-semibold text-gray-800">
-                        {metaSelecionada.tempoEstimado} hora{metaSelecionada.tempoEstimado > 1 ? 's' : ''}
+                        {metaSelecionada.tempoEstimado} minuto{metaSelecionada.tempoEstimado > 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>

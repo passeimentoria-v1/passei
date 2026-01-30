@@ -1,4 +1,18 @@
-import { doc, setDoc, collection, addDoc, writeBatch, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { 
+  doc, 
+  setDoc, 
+  collection, 
+  addDoc, 
+  deleteDoc,
+  updateDoc,
+  writeBatch, 
+  query, 
+  where, 
+  orderBy, 
+  getDocs,
+  increment,
+  Timestamp
+} from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase.config';
 import * as XLSX from 'xlsx';
@@ -38,11 +52,8 @@ export const processarExcel = async (file) => {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         
-        // Pegar a primeira aba
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
-        // Converter para JSON
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
         resolve({
@@ -126,7 +137,6 @@ export const organizarPorDisciplina = (dados) => {
  */
 export const criarCursoCompleto = async (dadosCurso, disciplinas, mentorId, arquivoInfo) => {
   try {
-    // 1. Criar o curso
     const cursoRef = doc(collection(db, 'cursos'));
     const cursoId = cursoRef.id;
     
@@ -147,13 +157,11 @@ export const criarCursoCompleto = async (dadosCurso, disciplinas, mentorId, arqu
       }
     });
     
-    // 2. Criar disciplinas e assuntos em batch
     const batch = writeBatch(db);
     let operacoes = 0;
-    const MAX_BATCH = 500; // Firestore limit
+    const MAX_BATCH = 500;
     
     for (const disciplina of disciplinas) {
-      // Criar disciplina
       const disciplinaRef = doc(collection(db, `cursos/${cursoId}/disciplinas`));
       
       batch.set(disciplinaRef, {
@@ -165,14 +173,12 @@ export const criarCursoCompleto = async (dadosCurso, disciplinas, mentorId, arqu
       
       operacoes++;
       
-      // Criar assuntos
       for (const assunto of disciplina.assuntos) {
         const assuntoRef = doc(collection(db, `cursos/${cursoId}/disciplinas/${disciplinaRef.id}/assuntos`));
         
         batch.set(assuntoRef, assunto);
         operacoes++;
         
-        // Se chegou no limite, commita e cria novo batch
         if (operacoes >= MAX_BATCH) {
           await batch.commit();
           operacoes = 0;
@@ -180,7 +186,6 @@ export const criarCursoCompleto = async (dadosCurso, disciplinas, mentorId, arqu
       }
     }
     
-    // Commitar operações restantes
     if (operacoes > 0) {
       await batch.commit();
     }
@@ -202,20 +207,13 @@ export const criarCursoCompleto = async (dadosCurso, disciplinas, mentorId, arqu
 };
 
 /**
- * Gerar cor aleatória para disciplina (tons pastéis)
+ * Gerar cor aleatória para disciplina
  */
 const gerarCorAleatoria = () => {
   const cores = [
-    '#3B82F6', // Azul
-    '#10B981', // Verde
-    '#F59E0B', // Amarelo
-    '#EF4444', // Vermelho
-    '#8B5CF6', // Roxo
-    '#EC4899', // Rosa
-    '#14B8A6', // Turquesa
-    '#F97316', // Laranja
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
+    '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
   ];
-  
   return cores[Math.floor(Math.random() * cores.length)];
 };
 
@@ -246,7 +244,181 @@ export const buscarCursosPorMentor = async (mentorId) => {
     console.error('Erro ao buscar cursos:', error);
     return {
       sucesso: false,
-      erro: 'Erro ao buscar cursos'
+      erro: 'Erro ao buscar cursos',
+      cursos: []
+    };
+  }
+};
+
+/**
+ * Adicionar disciplina manualmente
+ */
+export const adicionarDisciplina = async (cursoId, dadosDisciplina) => {
+  try {
+    const disciplinasRef = collection(db, `cursos/${cursoId}/disciplinas`);
+    
+    const novaDisciplina = {
+      nome: dadosDisciplina.nome,
+      cor: dadosDisciplina.cor || '#3B82F6',
+      ordem: dadosDisciplina.ordem || 0,
+      totalAssuntos: 0,
+      dataCriacao: Timestamp.now()
+    };
+
+    const docRef = await addDoc(disciplinasRef, novaDisciplina);
+
+    const cursoRef = doc(db, 'cursos', cursoId);
+    await updateDoc(cursoRef, {
+      totalDisciplinas: increment(1)
+    });
+
+    return {
+      sucesso: true,
+      disciplinaId: docRef.id
+    };
+  } catch (error) {
+    console.error('Erro ao adicionar disciplina:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao adicionar disciplina'
+    };
+  }
+};
+
+/**
+ * Excluir disciplina
+ */
+export const excluirDisciplina = async (cursoId, disciplinaId) => {
+  try {
+    const batch = writeBatch(db);
+
+    const assuntosRef = collection(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`);
+    const assuntosSnapshot = await getDocs(assuntosRef);
+    
+    let totalAssuntosExcluidos = 0;
+    assuntosSnapshot.forEach((assuntoDoc) => {
+      batch.delete(assuntoDoc.ref);
+      totalAssuntosExcluidos++;
+    });
+
+    const disciplinaRef = doc(db, `cursos/${cursoId}/disciplinas`, disciplinaId);
+    batch.delete(disciplinaRef);
+
+    const cursoRef = doc(db, 'cursos', cursoId);
+    batch.update(cursoRef, {
+      totalDisciplinas: increment(-1),
+      totalAssuntos: increment(-totalAssuntosExcluidos)
+    });
+
+    await batch.commit();
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao excluir disciplina:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao excluir disciplina'
+    };
+  }
+};
+
+/**
+ * NOVA FUNCIONALIDADE: Adicionar assunto manualmente
+ */
+export const adicionarAssunto = async (cursoId, disciplinaId, dadosAssunto) => {
+  try {
+    const assuntosRef = collection(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`);
+    
+    const novoAssunto = {
+      titulo: dadosAssunto.titulo,
+      ordem: dadosAssunto.ordem || 0,
+      tempos: {
+        paginasOuMinutos: parseInt(dadosAssunto.paginasOuMinutos) || 0,
+        expresso: parseInt(dadosAssunto.expresso) || 0,
+        regular: parseInt(dadosAssunto.regular) || 0,
+        calma: parseInt(dadosAssunto.calma) || 0
+      },
+      dicas: {
+        estudo: dadosAssunto.dicaEstudo || '',
+        revisoes: dadosAssunto.dicaRevisoes || '',
+        questoes: dadosAssunto.dicaQuestoes || ''
+      },
+      pesos: {
+        resumos: parseInt(dadosAssunto.pesoResumos) || 1,
+        revisoes: parseInt(dadosAssunto.pesoRevisoes) || 1,
+        questoes: parseInt(dadosAssunto.pesoQuestoes) || 1
+      },
+      numeroQuestoes: parseInt(dadosAssunto.numeroQuestoes) || 1,
+      links: {
+        estudo: dadosAssunto.linkEstudo || '',
+        resumo: dadosAssunto.linkResumo || '',
+        questoes: dadosAssunto.linkQuestoes || ''
+      },
+      referencia: dadosAssunto.referencia || '',
+      suplementar: dadosAssunto.suplementar || false,
+      dataCriacao: Timestamp.now()
+    };
+
+    const docRef = await addDoc(assuntosRef, novoAssunto);
+
+    // Atualizar contadores
+    const disciplinaRef = doc(db, `cursos/${cursoId}/disciplinas`, disciplinaId);
+    await updateDoc(disciplinaRef, {
+      totalAssuntos: increment(1)
+    });
+
+    const cursoRef = doc(db, 'cursos', cursoId);
+    await updateDoc(cursoRef, {
+      totalAssuntos: increment(1)
+    });
+
+    return {
+      sucesso: true,
+      assuntoId: docRef.id
+    };
+  } catch (error) {
+    console.error('Erro ao adicionar assunto:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao adicionar assunto'
+    };
+  }
+};
+
+/**
+ * NOVA FUNCIONALIDADE: Excluir assunto
+ */
+export const excluirAssunto = async (cursoId, disciplinaId, assuntoId) => {
+  try {
+    const batch = writeBatch(db);
+
+    // Excluir o assunto
+    const assuntoRef = doc(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`, assuntoId);
+    batch.delete(assuntoRef);
+
+    // Atualizar contadores
+    const disciplinaRef = doc(db, `cursos/${cursoId}/disciplinas`, disciplinaId);
+    batch.update(disciplinaRef, {
+      totalAssuntos: increment(-1)
+    });
+
+    const cursoRef = doc(db, 'cursos', cursoId);
+    batch.update(cursoRef, {
+      totalAssuntos: increment(-1)
+    });
+
+    await batch.commit();
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao excluir assunto:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao excluir assunto'
     };
   }
 };
