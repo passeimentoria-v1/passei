@@ -24,6 +24,10 @@ export const CriarMetas = () => {
   const [tipoEstudo, setTipoEstudo] = useState('regular');
   const [observacoes, setObservacoes] = useState('');
 
+  // ✅ NOVAS: Configurações avançadas
+  const [tempoPorDisciplina, setTempoPorDisciplina] = useState(60);
+  const [disciplinasPorDia, setDisciplinasPorDia] = useState(3);
+
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
@@ -108,6 +112,27 @@ export const CriarMetas = () => {
     } else {
       setAssuntosSelecionados([...assuntosSelecionados, assunto]);
     }
+  };
+
+  // ✅ NOVA: Selecionar todos os assuntos de uma disciplina
+  const selecionarTodosDisciplina = (disciplinaId) => {
+    const assuntosDaDisciplina = assuntos.filter(a => a.disciplinaId === disciplinaId && !a.oculto);
+    const novosAssuntos = [...assuntosSelecionados];
+    
+    assuntosDaDisciplina.forEach(assunto => {
+      if (!novosAssuntos.find(a => a.id === assunto.id)) {
+        novosAssuntos.push(assunto);
+      }
+    });
+    
+    setAssuntosSelecionados(novosAssuntos);
+  };
+
+  // ✅ NOVA: Desselecionar todos de uma disciplina
+  const desselecionarTodosDisciplina = (disciplinaId) => {
+    setAssuntosSelecionados(
+      assuntosSelecionados.filter(a => a.disciplinaId !== disciplinaId)
+    );
   };
 
   const handleCriarMetas = async () => {
@@ -278,15 +303,33 @@ export const CriarMetas = () => {
               <div className="space-y-3">
                 {disciplinas.map(disciplina => (
                   <div key={disciplina.id} className="border border-gray-200 rounded-lg">
-                    <button
-                      onClick={() => handleSelecionarDisciplina(disciplina.id)}
-                      className="flex items-center justify-between w-full px-4 py-3 hover:bg-gray-50"
-                    >
-                      <span className="font-medium text-gray-800">{disciplina.nome}</span>
-                      <span className="text-sm text-gray-500">
-                        Carregar {disciplina.totalAssuntos} assuntos
-                      </span>
-                    </button>
+                    <div className="flex items-center justify-between p-4">
+                      <button
+                        onClick={() => handleSelecionarDisciplina(disciplina.id)}
+                        className="flex-1 font-medium text-left text-gray-800"
+                      >
+                        <span className="font-medium text-gray-800">{disciplina.nome}</span>
+                        <span className="ml-2 text-sm text-gray-500">
+                          ({disciplina.totalAssuntos} assuntos)
+                        </span>
+                      </button>
+
+                      {/* ✅ NOVOS: Botões de seleção múltipla */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => selecionarTodosDisciplina(disciplina.id)}
+                          className="px-3 py-1 text-xs text-green-700 transition bg-green-100 rounded hover:bg-green-200"
+                        >
+                          ☑️ Selecionar Todos
+                        </button>
+                        <button
+                          onClick={() => desselecionarTodosDisciplina(disciplina.id)}
+                          className="px-3 py-1 text-xs text-gray-700 transition bg-gray-100 rounded hover:bg-gray-200"
+                        >
+                          ☐ Desselecionar
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -400,6 +443,43 @@ export const CriarMetas = () => {
                   placeholder="Adicione observações para o aluno..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              {/* ✅ NOVO: Configurações Avançadas */}
+              <div className="pt-4 mt-4 border-t border-gray-200">
+                <h3 className="mb-3 font-semibold text-gray-800">⚙️ Configurações Avançadas</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                      Tempo máximo por disciplina (min)
+                    </label>
+                    <input
+                      type="number"
+                      value={tempoPorDisciplina}
+                      onChange={(e) => setTempoPorDisciplina(e.target.value)}
+                      min="15"
+                      max="180"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Tempo máximo de estudo por matéria</p>
+                  </div>
+
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                      Disciplinas por dia
+                    </label>
+                    <input
+                      type="number"
+                      value={disciplinasPorDia}
+                      onChange={(e) => setDisciplinasPorDia(e.target.value)}
+                      min="1"
+                      max="10"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Quantas matérias diferentes por dia</p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3 mt-6">

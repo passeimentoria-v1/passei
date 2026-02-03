@@ -10,6 +10,7 @@ import {
   where, 
   orderBy, 
   getDocs,
+  getDoc,
   increment,
   Timestamp
 } from 'firebase/firestore';
@@ -125,7 +126,8 @@ export const organizarPorDisciplina = (dados) => {
         questoes: linha['Link de Questões'] || ''
       },
       referencia: linha['Referência'] || '',
-      suplementar: linha['Suplementar'] === 1 || linha['Suplementar'] === '1'
+      suplementar: linha['Suplementar'] === 1 || linha['Suplementar'] === '1',
+      oculto: false // Novo campo para ocultar assuntos
     });
   });
   
@@ -251,6 +253,71 @@ export const buscarCursosPorMentor = async (mentorId) => {
 };
 
 /**
+ * ✅ NOVA: Editar nome do curso
+ */
+export const editarNomeCurso = async (cursoId, novoNome) => {
+  try {
+    const cursoRef = doc(db, 'cursos', cursoId);
+    await updateDoc(cursoRef, {
+      nome: novoNome
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao editar curso:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao editar curso'
+    };
+  }
+};
+
+/**
+ * ✅ NOVA: Excluir curso completo
+ */
+export const excluirCurso = async (cursoId) => {
+  try {
+    // Buscar todas as disciplinas
+    const disciplinasRef = collection(db, `cursos/${cursoId}/disciplinas`);
+    const disciplinasSnapshot = await getDocs(disciplinasRef);
+    
+    // Para cada disciplina, excluir todos os assuntos
+    for (const disciplinaDoc of disciplinasSnapshot.docs) {
+      const assuntosRef = collection(db, `cursos/${cursoId}/disciplinas/${disciplinaDoc.id}/assuntos`);
+      const assuntosSnapshot = await getDocs(assuntosRef);
+      
+      const batch = writeBatch(db);
+      assuntosSnapshot.forEach((assuntoDoc) => {
+        batch.delete(assuntoDoc.ref);
+      });
+      
+      // Excluir a disciplina também
+      batch.delete(disciplinaDoc.ref);
+      await batch.commit();
+    }
+    
+    // Marcar curso como inativo (soft delete)
+    const cursoRef = doc(db, 'cursos', cursoId);
+    await updateDoc(cursoRef, {
+      ativo: false,
+      dataExclusao: Timestamp.now()
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao excluir curso:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao excluir curso'
+    };
+  }
+};
+
+/**
  * Adicionar disciplina manualmente
  */
 export const adicionarDisciplina = async (cursoId, dadosDisciplina) => {
@@ -281,6 +348,28 @@ export const adicionarDisciplina = async (cursoId, dadosDisciplina) => {
     return {
       sucesso: false,
       erro: 'Erro ao adicionar disciplina'
+    };
+  }
+};
+
+/**
+ * ✅ NOVA: Editar nome da disciplina
+ */
+export const editarNomeDisciplina = async (cursoId, disciplinaId, novoNome) => {
+  try {
+    const disciplinaRef = doc(db, `cursos/${cursoId}/disciplinas`, disciplinaId);
+    await updateDoc(disciplinaRef, {
+      nome: novoNome
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao editar disciplina:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao editar disciplina'
     };
   }
 };
@@ -325,7 +414,7 @@ export const excluirDisciplina = async (cursoId, disciplinaId) => {
 };
 
 /**
- * NOVA FUNCIONALIDADE: Adicionar assunto manualmente
+ * Adicionar assunto manualmente
  */
 export const adicionarAssunto = async (cursoId, disciplinaId, dadosAssunto) => {
   try {
@@ -358,12 +447,12 @@ export const adicionarAssunto = async (cursoId, disciplinaId, dadosAssunto) => {
       },
       referencia: dadosAssunto.referencia || '',
       suplementar: dadosAssunto.suplementar || false,
+      oculto: false, // Novo campo
       dataCriacao: Timestamp.now()
     };
 
     const docRef = await addDoc(assuntosRef, novoAssunto);
 
-    // Atualizar contadores
     const disciplinaRef = doc(db, `cursos/${cursoId}/disciplinas`, disciplinaId);
     await updateDoc(disciplinaRef, {
       totalAssuntos: increment(1)
@@ -388,17 +477,83 @@ export const adicionarAssunto = async (cursoId, disciplinaId, dadosAssunto) => {
 };
 
 /**
- * NOVA FUNCIONALIDADE: Excluir assunto
+ * ✅ NOVA: Editar nome do assunto
+ */
+export const editarNomeAssunto = async (cursoId, disciplinaId, assuntoId, novoNome) => {
+  try {
+    const assuntoRef = doc(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`, assuntoId);
+    await updateDoc(assuntoRef, {
+      titulo: novoNome
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao editar assunto:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao editar assunto'
+    };
+  }
+};
+
+/**
+ * ✅ NOVA: Editar tempos do assunto
+ */
+export const editarTemposAssunto = async (cursoId, disciplinaId, assuntoId, tempos) => {
+  try {
+    const assuntoRef = doc(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`, assuntoId);
+    await updateDoc(assuntoRef, {
+      'tempos.expresso': parseInt(tempos.expresso) || 0,
+      'tempos.regular': parseInt(tempos.regular) || 0,
+      'tempos.calma': parseInt(tempos.calma) || 0
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao editar tempos:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao editar tempos'
+    };
+  }
+};
+
+/**
+ * ✅ NOVA: Ocultar/Mostrar assunto
+ */
+export const toggleOcultarAssunto = async (cursoId, disciplinaId, assuntoId, ocultar) => {
+  try {
+    const assuntoRef = doc(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`, assuntoId);
+    await updateDoc(assuntoRef, {
+      oculto: ocultar
+    });
+
+    return {
+      sucesso: true
+    };
+  } catch (error) {
+    console.error('Erro ao ocultar/mostrar assunto:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao ocultar/mostrar assunto'
+    };
+  }
+};
+
+/**
+ * Excluir assunto
  */
 export const excluirAssunto = async (cursoId, disciplinaId, assuntoId) => {
   try {
     const batch = writeBatch(db);
 
-    // Excluir o assunto
     const assuntoRef = doc(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`, assuntoId);
     batch.delete(assuntoRef);
 
-    // Atualizar contadores
     const disciplinaRef = doc(db, `cursos/${cursoId}/disciplinas`, disciplinaId);
     batch.update(disciplinaRef, {
       totalAssuntos: increment(-1)
@@ -419,6 +574,59 @@ export const excluirAssunto = async (cursoId, disciplinaId, assuntoId) => {
     return {
       sucesso: false,
       erro: 'Erro ao excluir assunto'
+    };
+  }
+};
+
+/**
+ * ✅ NOVA: Buscar curso do aluno
+ */
+export const buscarCursoDoAluno = async (alunoId) => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('__name__', '==', alunoId));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return {
+        sucesso: false,
+        curso: null
+      };
+    }
+    
+    const aluno = snapshot.docs[0].data();
+    
+    if (!aluno.cursoId) {
+      return {
+        sucesso: true,
+        curso: null
+      };
+    }
+    
+    // Buscar dados do curso
+    const cursoRef = doc(db, 'cursos', aluno.cursoId);
+    const cursoSnap = await getDoc(cursoRef);
+    
+    if (!cursoSnap.exists()) {
+      return {
+        sucesso: true,
+        curso: null
+      };
+    }
+    
+    return {
+      sucesso: true,
+      curso: {
+        id: cursoSnap.id,
+        ...cursoSnap.data()
+      }
+    };
+  } catch (error) {
+    console.error('Erro ao buscar curso do aluno:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao buscar curso',
+      curso: null
     };
   }
 };
