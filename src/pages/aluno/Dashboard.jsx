@@ -201,6 +201,13 @@ export const AlunoDashboard = () => {
             <span>🎯</span>
             <span>Minhas Metas</span>
           </Link>
+          <Link
+            to="/aluno/configuracoes-estudo"
+            className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-white transition bg-orange-600 rounded-lg hover:bg-orange-700"
+          >
+            <span>⚙️</span>
+            <span>Configurar Estudo</span>
+          </Link>
           {statsFlashcards.paraRevisar > 0 && (
             <button
               onClick={() => navigate('/aluno/flashcards/revisar')}
