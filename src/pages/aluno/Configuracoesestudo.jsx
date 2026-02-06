@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { atualizarConfiguracoesEstudo, buscarConfiguracoesEstudo } from '../../services/userService';
+import { atualizarConfiguracoesEstudo, buscarConfiguracoesEstudo } from '../../services/Userservice';
 
 export const ConfiguracoesEstudo = () => {
   const navigate = useNavigate();
