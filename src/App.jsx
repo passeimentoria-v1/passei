@@ -29,7 +29,7 @@ import RelatoriosAluno from './pages/aluno/Relatorios';
 import Configuracoes from './pages/aluno/Configuracoes';
 import ReprogramarMetas from './pages/aluno/ReprogramarMetas';
 import MinhasMetas from './pages/aluno/MinhasMetas';
-import ConfiguracoesEstudo from './pages/aluno/ConfiguracoesEstudo';
+import ConfiguracoesEstudo from './pages/aluno/Configuracoesestudo';
 
 function App() {
   return (
