@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { buscarCursosPorMentor } from '../../services/cursoService';
 import { buscarAlunosPorMentor, criarMetasEmLote } from '../../services/metaService';
-import { buscarConfiguracoesEstudo } from '../../services/userService';
+import { buscarConfiguracoesEstudo } from '../../services/Userservice';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase.config';
 import { distribuirMetasAutomaticamente, converterParaMetas } from '../../utils/algoritmoDistribuicao';
