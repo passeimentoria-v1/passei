@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { buscarCursosPorMentor, excluirCurso, buscarCursoDoAluno } from '../../services/cursoService';
 import { buscarAlunosPorMentor } from '../../services/metaService';
-import { alternarStatusUsuario } from '../../services/userService';
+import { alternarStatusUsuario } from '../../services/Userservice';
 
 export const MentorDashboard = () => {
   const navigate = useNavigate();
