@@ -7,6 +7,7 @@ import {
   buscarMetasAlunoPorMentor,
   buscarQuestoesAlunoPorMentor
 } from '../../services/acompanhamentoService';
+import ModalTrocarCurso from '../../components/ModalTrocarCurso';
 
 export const AlunoDetalhes = () => {
   const { alunoId } = useParams();
@@ -18,6 +19,7 @@ export const AlunoDetalhes = () => {
   const [questoes, setQuestoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [abaSelecionada, setAbaSelecionada] = useState('visaoGeral'); // visaoGeral, metas, questoes
+  const [mostrarModalTrocaCurso, setMostrarModalTrocaCurso] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -51,6 +53,11 @@ export const AlunoDetalhes = () => {
     }
 
     setCarregando(false);
+  };
+
+  const handleTrocaCursoSucesso = () => {
+    setMostrarModalTrocaCurso(false);
+    carregarDados(); // Recarregar dados atualizados do aluno
   };
 
   const formatarData = (timestamp) => {
@@ -88,9 +95,9 @@ export const AlunoDetalhes = () => {
 
   if (carregando || !aluno || !estatisticas) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
           <p className="mt-4 text-gray-600">Carregando dados do aluno...</p>
         </div>
       </div>
@@ -100,7 +107,7 @@ export const AlunoDetalhes = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="px-4 py-4 mx-auto max-w-7xl">
           <div className="flex items-center gap-4 mb-4">
             <button
               onClick={() => navigate('/mentor/acompanhamento')}
@@ -112,29 +119,40 @@ export const AlunoDetalhes = () => {
           </div>
 
           {/* Cabeçalho do Aluno */}
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-              {aluno.fotoPerfil ? (
-                <img
-                  src={aluno.fotoPerfil}
-                  alt={aluno.nome}
-                  className="w-20 h-20 rounded-full"
-                />
-              ) : (
-                <span className="text-4xl">👨‍🎓</span>
-              )}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full">
+                {aluno.fotoPerfil ? (
+                  <img
+                    src={aluno.fotoPerfil}
+                    alt={aluno.nome}
+                    className="w-20 h-20 rounded-full"
+                  />
+                ) : (
+                  <span className="text-4xl">👨‍🎓</span>
+                )}
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">{aluno.nome}</h2>
+                <p className="text-gray-600">{aluno.email}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">{aluno.nome}</h2>
-              <p className="text-gray-600">{aluno.email}</p>
-            </div>
+
+            {/* Botão Trocar Curso */}
+            <button
+              onClick={() => setMostrarModalTrocaCurso(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 font-semibold text-white transition bg-purple-600 rounded-lg shadow-lg hover:bg-purple-700"
+            >
+              <span>🔄</span>
+              <span>Trocar Curso</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="px-4 py-8 mx-auto max-w-7xl">
         {/* Abas */}
-        <div className="bg-white rounded-lg shadow mb-6">
+        <div className="mb-6 bg-white rounded-lg shadow">
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setAbaSelecionada('visaoGeral')}
@@ -174,38 +192,38 @@ export const AlunoDetalhes = () => {
           <div className="space-y-6">
             {/* Cards de Estatísticas */}
             <div className="grid gap-4 md:grid-cols-4">
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Total de Metas</p>
-                <p className="text-3xl font-bold text-gray-800 mt-1">
+                <p className="mt-1 text-3xl font-bold text-gray-800">
                   {estatisticas.metas.total}
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Metas Concluídas</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">
+                <p className="mt-1 text-3xl font-bold text-green-600">
                   {estatisticas.metas.concluidas}
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Metas Atrasadas</p>
-                <p className="text-3xl font-bold text-red-600 mt-1">
+                <p className="mt-1 text-3xl font-bold text-red-600">
                   {estatisticas.metas.atrasadas}
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Progresso</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">
+                <p className="mt-1 text-3xl font-bold text-blue-600">
                   {estatisticas.metas.progresso}%
                 </p>
               </div>
             </div>
 
             {/* Progresso Visual */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            <div className="p-6 bg-white rounded-lg shadow">
+              <h3 className="mb-4 text-lg font-semibold text-gray-800">
                 Progresso de Metas
               </h3>
               <div className="mb-2">
@@ -217,7 +235,7 @@ export const AlunoDetalhes = () => {
                     {estatisticas.metas.progresso}%
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-4">
+                <div className="w-full h-4 bg-gray-200 rounded-full">
                   <div
                     className={`h-4 rounded-full transition-all ${getCorProgresso(estatisticas.metas.progresso)}`}
                     style={{ width: `${estatisticas.metas.progresso}%` }}
@@ -226,7 +244,7 @@ export const AlunoDetalhes = () => {
               </div>
 
               {estatisticas.metas.atrasadas > 0 && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-3 mt-4 border border-red-200 rounded-lg bg-red-50">
                   <p className="text-sm text-red-700">
                     🚨 <strong>{estatisticas.metas.atrasadas}</strong> metas atrasadas!
                   </p>
@@ -236,23 +254,23 @@ export const AlunoDetalhes = () => {
 
             {/* Estatísticas de Questões */}
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Total de Questões</p>
-                <p className="text-3xl font-bold text-gray-800 mt-1">
+                <p className="mt-1 text-3xl font-bold text-gray-800">
                   {estatisticas.questoes.total}
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Taxa de Acerto</p>
                 <p className={`text-3xl font-bold mt-1 ${getCorPercentual(estatisticas.questoes.mediaAcerto)}`}>
                   {estatisticas.questoes.mediaAcerto}%
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-4">
+              <div className="p-4 bg-white rounded-lg shadow">
                 <p className="text-sm text-gray-600">Registros</p>
-                <p className="text-3xl font-bold text-purple-600 mt-1">
+                <p className="mt-1 text-3xl font-bold text-purple-600">
                   {estatisticas.questoes.totalRegistros}
                 </p>
               </div>
@@ -261,27 +279,27 @@ export const AlunoDetalhes = () => {
             {/* Desempenho por Disciplina */}
             {estatisticas.questoes.porDisciplina && 
              Object.keys(estatisticas.questoes.porDisciplina).length > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              <div className="p-6 bg-white rounded-lg shadow">
+                <h3 className="mb-4 text-lg font-semibold text-gray-800">
                   Desempenho por Disciplina
                 </h3>
                 <div className="space-y-4">
                   {Object.entries(estatisticas.questoes.porDisciplina)
                     .sort((a, b) => b[1].percentual - a[1].percentual)
                     .map(([disciplina, dados]) => (
-                      <div key={disciplina} className="border-b border-gray-200 pb-4 last:border-0">
+                      <div key={disciplina} className="pb-4 border-b border-gray-200 last:border-0">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-800">{disciplina}</span>
                           <span className={`font-bold text-lg ${getCorPercentual(dados.percentual)}`}>
                             {dados.percentual}%
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                        <div className="flex items-center gap-4 mb-2 text-sm text-gray-600">
                           <span>📊 {dados.total} questões</span>
                           <span className="text-green-600">✓ {dados.acertos}</span>
                           <span className="text-red-600">✗ {dados.erros}</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div
                             className={`h-2 rounded-full ${
                               dados.percentual >= 70 ? 'bg-green-500' :
@@ -298,15 +316,15 @@ export const AlunoDetalhes = () => {
 
             {/* Últimas Atividades */}
             {estatisticas.ultimasAtividades && estatisticas.ultimasAtividades.length > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              <div className="p-6 bg-white rounded-lg shadow">
+                <h3 className="mb-4 text-lg font-semibold text-gray-800">
                   Últimas Atividades
                 </h3>
                 <div className="space-y-3">
                   {estatisticas.ultimasAtividades.map((atividade, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center gap-3 p-3 rounded-lg bg-gray-50"
                     >
                       <span className="text-2xl">{atividade.icone}</span>
                       <div className="flex-1">
@@ -335,7 +353,7 @@ export const AlunoDetalhes = () => {
             </div>
             <div className="p-6">
               {metas.length === 0 ? (
-                <p className="text-center text-gray-600 py-8">Nenhuma meta criada ainda</p>
+                <p className="py-8 text-center text-gray-600">Nenhuma meta criada ainda</p>
               ) : (
                 <div className="space-y-3">
                   {metas.map(meta => {
@@ -369,22 +387,22 @@ export const AlunoDetalhes = () => {
                               <span className="capitalize">📚 {meta.tipoEstudo}</span>
                             </div>
                             {meta.observacoes && (
-                              <p className="text-sm text-gray-600 mt-2 italic">
+                              <p className="mt-2 text-sm italic text-gray-600">
                                 "{meta.observacoes}"
                               </p>
                             )}
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             {meta.concluida ? (
-                              <span className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
+                              <span className="px-3 py-1 text-xs text-white bg-green-600 rounded-full">
                                 ✓ Concluída
                               </span>
                             ) : atrasada ? (
-                              <span className="px-3 py-1 bg-red-600 text-white text-xs rounded-full">
+                              <span className="px-3 py-1 text-xs text-white bg-red-600 rounded-full">
                                 🚨 Atrasada
                               </span>
                             ) : (
-                              <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
+                              <span className="px-3 py-1 text-xs text-orange-700 bg-orange-100 rounded-full">
                                 ⏳ Pendente
                               </span>
                             )}
@@ -409,13 +427,13 @@ export const AlunoDetalhes = () => {
             </div>
             <div className="p-6">
               {questoes.length === 0 ? (
-                <p className="text-center text-gray-600 py-8">Nenhum registro de questões</p>
+                <p className="py-8 text-center text-gray-600">Nenhum registro de questões</p>
               ) : (
                 <div className="space-y-3">
                   {questoes.map(questao => (
                     <div
                       key={questao.id}
-                      className="border border-gray-200 rounded-lg p-4"
+                      className="p-4 border border-gray-200 rounded-lg"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -425,23 +443,23 @@ export const AlunoDetalhes = () => {
                           <p className="text-sm text-gray-600">
                             {questao.disciplinaNome}
                           </p>
-                          <div className="flex items-center gap-4 text-sm mt-2">
+                          <div className="flex items-center gap-4 mt-2 text-sm">
                             <span className="text-gray-600">
                               📊 {questao.totalQuestoes} questões
                             </span>
-                            <span className="text-green-600 font-medium">
+                            <span className="font-medium text-green-600">
                               ✓ {questao.acertos} acertos
                             </span>
-                            <span className="text-red-600 font-medium">
+                            <span className="font-medium text-red-600">
                               ✗ {questao.erros} erros
                             </span>
                           </div>
                           {questao.observacoes && (
-                            <p className="text-sm text-gray-600 mt-2 italic">
+                            <p className="mt-2 text-sm italic text-gray-600">
                               "{questao.observacoes}"
                             </p>
                           )}
-                          <p className="text-xs text-gray-400 mt-2">
+                          <p className="mt-2 text-xs text-gray-400">
                             {formatarDataHora(questao.dataRegistro)}
                           </p>
                         </div>
@@ -457,6 +475,15 @@ export const AlunoDetalhes = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de Troca de Curso */}
+      {mostrarModalTrocaCurso && (
+        <ModalTrocarCurso
+          aluno={aluno}
+          onClose={() => setMostrarModalTrocaCurso(false)}
+          onSucesso={handleTrocaCursoSucesso}
+        />
+      )}
     </div>
   );
 };

@@ -9,6 +9,7 @@ import {
   concluirMeta,
   desconcluirMeta
 } from '../services/metaService';
+import { reagendarMetaProximoDiaLivre } from '../services/reagendamentoService';
 
 export const ModalMetaComComentarios = ({ meta, onClose, onAtualizar }) => {
   const { usuario } = useAuth();
@@ -17,6 +18,7 @@ export const ModalMetaComComentarios = ({ meta, onClose, onAtualizar }) => {
   const [status, setStatus] = useState(meta.status || 'Pendente');
   const [carregandoComentarios, setCarregandoComentarios] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [reagendando, setReagendando] = useState(false);
 
   useEffect(() => {
     carregarComentarios();
@@ -75,6 +77,46 @@ export const ModalMetaComComentarios = ({ meta, onClose, onAtualizar }) => {
       if (onAtualizar) onAtualizar();
       onClose();
     }
+  };
+
+  // ✅ NOVA: Função para reagendar meta
+  const handleReagendar = async () => {
+    const confirmacao = window.confirm(
+      '⏰ Precisa de mais tempo para estudar este assunto?\n\n' +
+      'A meta será reagendada para o próximo dia livre na sua agenda.\n\n' +
+      'Deseja continuar?'
+    );
+    
+    if (!confirmacao) return;
+    
+    setReagendando(true);
+    
+    const resultado = await reagendarMetaProximoDiaLivre(meta.id, usuario.uid);
+    
+    if (resultado.sucesso) {
+      const novaDataFormatada = resultado.novaData.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        weekday: 'long'
+      });
+      
+      const horasDisponiveis = Math.floor(resultado.espacoDisponivel / 60);
+      const minutosDisponiveis = resultado.espacoDisponivel % 60;
+      
+      alert(
+        '✅ Meta reagendada com sucesso!\n\n' +
+        `📅 Nova data: ${novaDataFormatada}\n` +
+        `⏱ Tempo disponível: ${horasDisponiveis}h ${minutosDisponiveis}min`
+      );
+      
+      if (onAtualizar) onAtualizar();
+      onClose();
+    } else {
+      alert('❌ Erro ao reagendar meta:\n\n' + resultado.erro);
+    }
+    
+    setReagendando(false);
   };
 
   const formatarDataHora = (timestamp) => {
@@ -245,15 +287,29 @@ export const ModalMetaComComentarios = ({ meta, onClose, onAtualizar }) => {
             </div>
           </div>
 
-          {/* Botão de Concluir Meta */}
-          {!meta.concluida && (
-            <button
-              onClick={handleToggleConcluida}
-              className="w-full py-3 font-semibold text-white transition bg-green-600 rounded-lg hover:bg-green-700"
-            >
-              ✓ Marcar como Concluída
-            </button>
-          )}
+          {/* Botões de Ação */}
+          <div className="flex flex-col gap-3">
+            {/* Botão de Concluir Meta */}
+            {!meta.concluida && (
+              <button
+                onClick={handleToggleConcluida}
+                className="w-full py-3 font-semibold text-white transition bg-green-600 rounded-lg hover:bg-green-700"
+              >
+                ✓ Marcar como Concluída
+              </button>
+            )}
+
+            {/* ✅ NOVO: Botão Preciso de Mais Tempo */}
+            {!meta.concluida && (
+              <button
+                onClick={handleReagendar}
+                disabled={reagendando}
+                className="w-full py-3 font-semibold text-white transition bg-orange-600 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {reagendando ? '⏳ Reagendando...' : '⏰ Preciso de Mais Tempo'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

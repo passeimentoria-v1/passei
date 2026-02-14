@@ -13,6 +13,11 @@ import {
   editarTemposAssunto,
   toggleOcultarAssunto
 } from '../../services/cursoService';
+import { 
+  arquivarMetasDoAssunto, 
+  ocultarMetasDoAssunto,
+  verificarMetasDoAssunto
+} from '../../services/metaAssuntoService';
 
 export const CursoDetalhes = () => {
   const { cursoId } = useParams();
@@ -239,13 +244,28 @@ export const CursoDetalhes = () => {
   const handleToggleOcultar = async (assuntoId, ocultar) => {
     const disciplinaId = assuntos.find(a => a.id === assuntoId)?.disciplinaId || disciplinaSelecionada;
     
+    // Ocultar/reativar o assunto no curso
     const resultado = await toggleOcultarAssunto(cursoId, disciplinaId, assuntoId, ocultar);
+    
     if (resultado.sucesso) {
+      // Atualizar estado local
       setAssuntos(assuntos.map(a => 
         a.id === assuntoId ? {...a, oculto: ocultar} : a
       ));
-      setSucesso(ocultar ? 'Assunto ocultado!' : 'Assunto reativado!');
-      setTimeout(() => setSucesso(''), 2000);
+      
+      // ✅ NOVO: Ocultar/reativar metas deste assunto
+      const resultadoMetas = await ocultarMetasDoAssunto(assuntoId, ocultar);
+      
+      if (resultadoMetas.sucesso) {
+        const mensagem = ocultar 
+          ? `Assunto ocultado! ${resultadoMetas.metasAfetadas} meta(s) também foram ocultadas.`
+          : `Assunto reativado! ${resultadoMetas.metasAfetadas} meta(s) também foram reativadas.`;
+        setSucesso(mensagem);
+      } else {
+        setSucesso(ocultar ? 'Assunto ocultado!' : 'Assunto reativado!');
+      }
+      
+      setTimeout(() => setSucesso(''), 3000);
     } else {
       setErro(resultado.erro);
     }
@@ -366,18 +386,48 @@ export const CursoDetalhes = () => {
   };
 
   const handleExcluirAssunto = async (disciplinaId, assuntoId, assuntoTitulo) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o assunto "${assuntoTitulo}"?`)) {
+    // ✅ NOVO: Verificar se tem metas antes de excluir
+    const verificacao = await verificarMetasDoAssunto(assuntoId);
+    
+    let mensagemConfirmacao = `Tem certeza que deseja excluir o assunto "${assuntoTitulo}"?`;
+    
+    if (verificacao.sucesso && verificacao.temMetas) {
+      mensagemConfirmacao = `⚠️ ATENÇÃO!\n\nO assunto "${assuntoTitulo}" tem:\n` +
+        `• ${verificacao.totalMetas} meta(s) cadastrada(s) para alunos\n` +
+        `• ${verificacao.metasNaoConcluidas} meta(s) ainda não concluída(s)\n` +
+        `• ${verificacao.metasConcluidas} meta(s) já concluída(s)\n\n` +
+        `Ao excluir este assunto, TODAS essas metas serão ARQUIVADAS.\n\n` +
+        `Deseja realmente continuar?`;
+    }
+
+    if (!window.confirm(mensagemConfirmacao)) {
       return;
     }
 
+    // ✅ NOVO: Arquivar metas antes de excluir o assunto
+    if (verificacao.temMetas) {
+      const resultadoMetas = await arquivarMetasDoAssunto(assuntoId, 'assunto_excluido');
+      
+      if (!resultadoMetas.sucesso) {
+        setErro('Erro ao arquivar metas. Assunto não foi excluído.');
+        setTimeout(() => setErro(''), 3000);
+        return;
+      }
+    }
+
+    // Excluir o assunto
     const resultado = await excluirAssunto(cursoId, disciplinaId, assuntoId);
 
     if (resultado.sucesso) {
-      setSucesso('Assunto excluído com sucesso!');
+      const mensagemSucesso = verificacao.temMetas
+        ? `Assunto excluído com sucesso! ${verificacao.totalMetas} meta(s) foram arquivadas.`
+        : 'Assunto excluído com sucesso!';
+      
+      setSucesso(mensagemSucesso);
       carregarAssuntos(disciplinaId);
       carregarDisciplinas();
       carregarCurso();
-      setTimeout(() => setSucesso(''), 3000);
+      setTimeout(() => setSucesso(''), 4000);
     } else {
       setErro(resultado.erro);
       setTimeout(() => setErro(''), 3000);

@@ -18,6 +18,7 @@ import AlunoDetalhes from './pages/mentor/AlunoDetalhes';
 import DuvidasAlunos from './pages/mentor/DuvidasAlunos';
 import RelatoriosMentor from './pages/mentor/RelatoriosMentor';
 
+
 // Páginas do Aluno
 import AlunoDashboard from './pages/aluno/Dashboard';
 import RegistrarQuestoes from './pages/aluno/RegistrarQuestoes';
@@ -30,6 +31,7 @@ import Configuracoes from './pages/aluno/Configuracoes';
 import ReprogramarMetas from './pages/aluno/ReprogramarMetas';
 import MinhasMetas from './pages/aluno/MinhasMetas';
 import ConfiguracoesEstudo from './pages/aluno/Configuracoesestudo';
+
 
 function App() {
   return (

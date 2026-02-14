@@ -7,87 +7,224 @@ export const ConfiguracoesEstudo = () => {
   const navigate = useNavigate();
   const { usuario } = useAuth();
 
-  const [configuracoes, setConfiguracoes] = useState({
-    diasPorSemana: 5,
-    horasPorDia: 4,
-    tempoPorDisciplina: 60,
-    disciplinasPorDia: 3
-  });
+  const diasDaSemana = [
+    { id: 'segunda', nome: 'Segunda-feira', abrev: 'Seg' },
+    { id: 'terca', nome: 'Terça-feira', abrev: 'Ter' },
+    { id: 'quarta', nome: 'Quarta-feira', abrev: 'Qua' },
+    { id: 'quinta', nome: 'Quinta-feira', abrev: 'Qui' },
+    { id: 'sexta', nome: 'Sexta-feira', abrev: 'Sex' },
+    { id: 'sabado', nome: 'Sábado', abrev: 'Sáb' },
+    { id: 'domingo', nome: 'Domingo', abrev: 'Dom' }
+  ];
 
+  const configuracoesDefault = {
+    horasPorDia: {
+      segunda: 4,
+      terca: 4,
+      quarta: 4,
+      quinta: 4,
+      sexta: 4,
+      sabado: 0,
+      domingo: 0
+    }
+  };
+
+  const [configuracoes, setConfiguracoes] = useState(configuracoesDefault);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [sucesso, setSucesso] = useState('');
   const [erro, setErro] = useState('');
 
   useEffect(() => {
-    carregarConfiguracoes();
-  }, []);
+    // Só carrega se o usuário estiver disponível
+    if (usuario && usuario.uid) {
+      carregarConfiguracoes();
+    } else {
+      setCarregando(false);
+    }
+  }, [usuario]);
 
   const carregarConfiguracoes = async () => {
-    setCarregando(true);
-    const resultado = await buscarConfiguracoesEstudo(usuario.uid);
-    
-    if (resultado.sucesso) {
-      setConfiguracoes(resultado.configuracoes);
+    // Verificação adicional de segurança
+    if (!usuario || !usuario.uid) {
+      console.log('⚠️ Usuário não disponível ainda');
+      setCarregando(false);
+      return;
     }
-    
-    setCarregando(false);
+
+    try {
+      setCarregando(true);
+      console.log('🔍 Carregando configurações do Firebase...');
+      
+      const resultado = await buscarConfiguracoesEstudo(usuario.uid);
+      console.log('📦 Resultado do Firebase:', resultado);
+      
+      if (resultado.sucesso && resultado.configuracoes) {
+        const configSalvas = resultado.configuracoes;
+        console.log('✅ Configurações encontradas:', configSalvas);
+        
+        // Verificar se já está no novo formato (objeto com dias da semana)
+        if (configSalvas.horasPorDia && typeof configSalvas.horasPorDia === 'object' && 
+            configSalvas.horasPorDia.segunda !== undefined) {
+          // Já está no formato correto
+          console.log('✅ Formato correto detectado, carregando...');
+          
+          // Remover diasPorSemana se existir (campo obsoleto)
+          const { diasPorSemana, ...configLimpa } = configSalvas;
+          setConfiguracoes(configLimpa);
+        } else {
+          // Formato antigo, precisa migrar
+          console.log('⚠️ Formato antigo detectado, migrando...');
+          const horasDefault = typeof configSalvas.horasPorDia === 'number' 
+            ? configSalvas.horasPorDia 
+            : 4;
+          
+          const configMigradas = {
+            horasPorDia: {
+              segunda: horasDefault,
+              terca: horasDefault,
+              quarta: horasDefault,
+              quinta: horasDefault,
+              sexta: horasDefault,
+              sabado: 0,
+              domingo: 0
+            }
+          };
+          
+          setConfiguracoes(configMigradas);
+          
+          // Salvar o formato migrado automaticamente
+          console.log('💾 Salvando formato migrado automaticamente...');
+          await atualizarConfiguracoesEstudo(usuario.uid, configMigradas);
+        }
+      } else {
+        console.log('ℹ️ Nenhuma configuração encontrada, usando padrão');
+        setConfiguracoes(configuracoesDefault);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar configurações:', error);
+      setErro('Erro ao carregar configurações. Usando valores padrão.');
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const handleSalvar = async (e) => {
     e.preventDefault();
+    
+    // Verificar se usuário está disponível
+    if (!usuario || !usuario.uid) {
+      setErro('Usuário não autenticado');
+      return;
+    }
+
     setErro('');
     setSucesso('');
     setSalvando(true);
 
-    // Validações
-    if (configuracoes.diasPorSemana < 1 || configuracoes.diasPorSemana > 7) {
-      setErro('Dias por semana deve estar entre 1 e 7');
+    try {
+      console.log('💾 Salvando configurações:', configuracoes);
+
+      // Validações
+      const diasComHoras = contarDiasComHoras();
+      
+      if (diasComHoras === 0) {
+        setErro('Configure pelo menos 1 dia com horas de estudo');
+        setSalvando(false);
+        return;
+      }
+
+      // Verificar se há horas inválidas
+      const horasInvalidas = Object.values(configuracoes.horasPorDia).some(
+        horas => horas < 0 || horas > 12
+      );
+
+      if (horasInvalidas) {
+        setErro('Horas por dia devem estar entre 0 e 12');
+        setSalvando(false);
+        return;
+      }
+
+      const resultado = await atualizarConfiguracoesEstudo(usuario.uid, configuracoes);
+      console.log('📤 Resultado do salvamento:', resultado);
+
+      if (resultado.sucesso) {
+        setSucesso('Configurações salvas com sucesso!');
+        console.log('✅ Configurações salvas com sucesso!');
+        console.log('📊 Dias com horas configuradas:', diasComHoras);
+        
+        // Recarregar para confirmar que salvou
+        setTimeout(async () => {
+          const verificacao = await buscarConfiguracoesEstudo(usuario.uid);
+          console.log('🔍 Verificação pós-salvamento:', verificacao);
+        }, 500);
+        
+        setTimeout(() => {
+          setSucesso('');
+        }, 3000);
+      } else {
+        console.error('❌ Erro ao salvar:', resultado.erro);
+        setErro(resultado.erro || 'Erro ao salvar configurações');
+      }
+    } catch (error) {
+      console.error('❌ Erro no handleSalvar:', error);
+      setErro('Erro ao salvar configurações');
+    } finally {
       setSalvando(false);
-      return;
     }
-
-    if (configuracoes.horasPorDia < 0.5 || configuracoes.horasPorDia > 12) {
-      setErro('Horas por dia deve estar entre 0.5 e 12');
-      setSalvando(false);
-      return;
-    }
-
-    if (configuracoes.tempoPorDisciplina < 15 || configuracoes.tempoPorDisciplina > 180) {
-      setErro('Tempo por disciplina deve estar entre 15 e 180 minutos');
-      setSalvando(false);
-      return;
-    }
-
-    if (configuracoes.disciplinasPorDia < 1 || configuracoes.disciplinasPorDia > 10) {
-      setErro('Disciplinas por dia deve estar entre 1 e 10');
-      setSalvando(false);
-      return;
-    }
-
-    const resultado = await atualizarConfiguracoesEstudo(usuario.uid, configuracoes);
-
-    if (resultado.sucesso) {
-      setSucesso('Configurações salvas com sucesso!');
-      setTimeout(() => {
-        setSucesso('');
-      }, 3000);
-    } else {
-      setErro(resultado.erro || 'Erro ao salvar configurações');
-    }
-
-    setSalvando(false);
   };
 
-  const calcularTotalHoras = () => {
-    return (configuracoes.diasPorSemana * configuracoes.horasPorDia).toFixed(1);
+  const contarDiasComHoras = () => {
+    return Object.values(configuracoes.horasPorDia).filter(horas => horas > 0).length;
   };
 
-  const calcularTempoDisponivel = () => {
-    const totalMinutosPorDia = configuracoes.horasPorDia * 60;
-    const tempoGasto = configuracoes.disciplinasPorDia * configuracoes.tempoPorDisciplina;
-    return totalMinutosPorDia - tempoGasto;
+  const calcularTotalHorasSemana = () => {
+    return Object.values(configuracoes.horasPorDia)
+      .reduce((total, horas) => total + horas, 0)
+      .toFixed(1);
   };
+
+  const calcularMediaHorasDia = () => {
+    const diasComHoras = contarDiasComHoras();
+    if (diasComHoras === 0) return 0;
+    return (parseFloat(calcularTotalHorasSemana()) / diasComHoras).toFixed(1);
+  };
+
+  const atualizarHorasDia = (dia, valor) => {
+    const novoValor = parseFloat(valor) || 0;
+    console.log(`📝 Atualizando ${dia}: ${novoValor}h`);
+    
+    setConfiguracoes(prev => ({
+      ...prev,
+      horasPorDia: {
+        ...prev.horasPorDia,
+        [dia]: novoValor
+      }
+    }));
+  };
+
+  const aplicarHorasParaTodos = (horas) => {
+    console.log(`🔄 Aplicando ${horas}h para todos os dias`);
+    const novasHoras = {};
+    diasDaSemana.forEach(dia => {
+      novasHoras[dia.id] = horas;
+    });
+    setConfiguracoes({
+      horasPorDia: novasHoras
+    });
+  };
+
+  // Se o usuário não está autenticado, redirecionar
+  if (!usuario) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-600">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (carregando) {
     return (
@@ -112,7 +249,7 @@ export const ConfiguracoesEstudo = () => {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-blue-600">Configurações de Estudo</h1>
-            <p className="text-sm text-gray-600">Personalize seu cronograma de estudos</p>
+            <p className="text-sm text-gray-600">Defina sua disponibilidade semanal</p>
           </div>
         </div>
       </header>
@@ -132,23 +269,19 @@ export const ConfiguracoesEstudo = () => {
 
         {/* Card de Resumo */}
         <div className="p-6 mb-6 text-white rounded-lg shadow-lg bg-gradient-to-r from-blue-500 to-purple-600">
-          <h2 className="mb-4 text-xl font-bold">📊 Seu Plano de Estudos</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <h2 className="mb-4 text-xl font-bold">📊 Resumo da Disponibilidade</h2>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="p-4 bg-white rounded-lg bg-opacity-20 backdrop-blur">
               <p className="text-sm opacity-90">Dias/Semana</p>
-              <p className="text-3xl font-bold">{configuracoes.diasPorSemana}</p>
-            </div>
-            <div className="p-4 bg-white rounded-lg bg-opacity-20 backdrop-blur">
-              <p className="text-sm opacity-90">Horas/Dia</p>
-              <p className="text-3xl font-bold">{configuracoes.horasPorDia}h</p>
+              <p className="text-3xl font-bold">{contarDiasComHoras()}</p>
             </div>
             <div className="p-4 bg-white rounded-lg bg-opacity-20 backdrop-blur">
               <p className="text-sm opacity-90">Total/Semana</p>
-              <p className="text-3xl font-bold">{calcularTotalHoras()}h</p>
+              <p className="text-3xl font-bold">{calcularTotalHorasSemana()}h</p>
             </div>
             <div className="p-4 bg-white rounded-lg bg-opacity-20 backdrop-blur">
-              <p className="text-sm opacity-90">Disciplinas/Dia</p>
-              <p className="text-3xl font-bold">{configuracoes.disciplinasPorDia}</p>
+              <p className="text-sm opacity-90">Média/Dia</p>
+              <p className="text-3xl font-bold">{calcularMediaHorasDia()}h</p>
             </div>
           </div>
         </div>
@@ -156,159 +289,170 @@ export const ConfiguracoesEstudo = () => {
         {/* Formulário */}
         <form onSubmit={handleSalvar} className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800">⚙️ Configurações</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Defina quantos dias e horas você tem disponível para estudar
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">⚙️ Disponibilidade por Dia</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Configure quantas horas você tem disponível em cada dia da semana
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => aplicarHorasParaTodos(4)}
+                  className="px-3 py-1 text-sm text-blue-600 transition border border-blue-600 rounded-lg hover:bg-blue-50"
+                >
+                  4h para todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => aplicarHorasParaTodos(0)}
+                  className="px-3 py-1 text-sm text-gray-600 transition border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Limpar tudo
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="p-6 space-y-6">
-            {/* Dias por Semana */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">
-                📅 Quantos dias por semana você pode estudar?
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="1"
-                  max="7"
-                  value={configuracoes.diasPorSemana}
-                  onChange={(e) => setConfiguracoes({...configuracoes, diasPorSemana: parseInt(e.target.value)})}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="w-20 text-center">
-                  <span className="text-2xl font-bold text-blue-600">{configuracoes.diasPorSemana}</span>
-                  <p className="text-xs text-gray-500">
-                    {configuracoes.diasPorSemana === 1 ? 'dia' : 'dias'}
-                  </p>
+            {diasDaSemana.map((dia) => (
+              <div key={dia.id} className="flex items-center gap-4">
+                <div className="w-32">
+                  <p className="font-medium text-gray-700">{dia.nome}</p>
+                  <p className="text-xs text-gray-500">{dia.abrev}</p>
                 </div>
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-500">
-                <span>1 dia</span>
-                <span>7 dias</span>
-              </div>
-            </div>
-
-            {/* Horas por Dia */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">
-                ⏰ Quantas horas por dia você pode dedicar aos estudos?
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="0.5"
-                  max="12"
-                  step="0.5"
-                  value={configuracoes.horasPorDia}
-                  onChange={(e) => setConfiguracoes({...configuracoes, horasPorDia: parseFloat(e.target.value)})}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="w-20 text-center">
-                  <span className="text-2xl font-bold text-blue-600">{configuracoes.horasPorDia}</span>
-                  <p className="text-xs text-gray-500">horas</p>
+                
+                <div className="flex items-center flex-1 gap-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="12"
+                    step="0.5"
+                    value={configuracoes.horasPorDia[dia.id]}
+                    onChange={(e) => atualizarHorasDia(dia.id, e.target.value)}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: configuracoes.horasPorDia[dia.id] > 0 
+                        ? `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(configuracoes.horasPorDia[dia.id] / 12) * 100}%, #E5E7EB ${(configuracoes.horasPorDia[dia.id] / 12) * 100}%, #E5E7EB 100%)`
+                        : '#E5E7EB'
+                    }}
+                  />
+                  
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      step="0.5"
+                      value={configuracoes.horasPorDia[dia.id]}
+                      onChange={(e) => atualizarHorasDia(dia.id, e.target.value)}
+                      className="w-20 px-3 py-2 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <span className="text-sm font-medium text-gray-600">horas</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-500">
-                <span>30 min</span>
-                <span>12 horas</span>
-              </div>
-            </div>
 
-            {/* Tempo por Disciplina */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">
-                📚 Tempo máximo por disciplina (minutos)
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="15"
-                  max="180"
-                  step="15"
-                  value={configuracoes.tempoPorDisciplina}
-                  onChange={(e) => setConfiguracoes({...configuracoes, tempoPorDisciplina: parseInt(e.target.value)})}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="w-20 text-center">
-                  <span className="text-2xl font-bold text-blue-600">{configuracoes.tempoPorDisciplina}</span>
-                  <p className="text-xs text-gray-500">min</p>
-                </div>
+                {configuracoes.horasPorDia[dia.id] === 0 && (
+                  <span className="px-2 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded">
+                    Sem estudo
+                  </span>
+                )}
+                
+                {configuracoes.horasPorDia[dia.id] > 0 && configuracoes.horasPorDia[dia.id] < 2 && (
+                  <span className="px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 rounded">
+                    Pouco tempo
+                  </span>
+                )}
+                
+                {configuracoes.horasPorDia[dia.id] >= 2 && configuracoes.horasPorDia[dia.id] <= 6 && (
+                  <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded">
+                    Ideal
+                  </span>
+                )}
+                
+                {configuracoes.horasPorDia[dia.id] > 6 && (
+                  <span className="px-2 py-1 text-xs font-medium text-orange-700 bg-orange-100 rounded">
+                    Muito tempo
+                  </span>
+                )}
               </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-500">
-                <span>15 min</span>
-                <span>3 horas</span>
-              </div>
-            </div>
+            ))}
 
-            {/* Disciplinas por Dia */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">
-                🎯 Quantas disciplinas diferentes por dia?
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={configuracoes.disciplinasPorDia}
-                  onChange={(e) => setConfiguracoes({...configuracoes, disciplinasPorDia: parseInt(e.target.value)})}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="w-20 text-center">
-                  <span className="text-2xl font-bold text-blue-600">{configuracoes.disciplinasPorDia}</span>
-                  <p className="text-xs text-gray-500">
-                    {configuracoes.disciplinasPorDia === 1 ? 'matéria' : 'matérias'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-500">
-                <span>1 disciplina</span>
-                <span>10 disciplinas</span>
-              </div>
-            </div>
-
-            {/* Tempo Disponível/Usado */}
+            {/* Resumo visual */}
             <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-              <h3 className="mb-2 font-semibold text-blue-900">💡 Análise do Plano</h3>
+              <h3 className="mb-3 font-semibold text-blue-900">📈 Distribuição Semanal</h3>
+              <div className="flex items-end justify-between h-32 gap-2">
+                {diasDaSemana.map((dia) => (
+                  <div key={dia.id} className="flex flex-col items-center flex-1 gap-2">
+                    <div className="relative flex-1 w-full">
+                      <div 
+                        className="absolute bottom-0 w-full transition-all bg-blue-500 rounded-t"
+                        style={{ 
+                          height: `${(configuracoes.horasPorDia[dia.id] / 12) * 100}%`,
+                          minHeight: configuracoes.horasPorDia[dia.id] > 0 ? '4px' : '0'
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-medium text-gray-700">{dia.abrev}</p>
+                      <p className="text-xs font-bold text-blue-600">
+                        {configuracoes.horasPorDia[dia.id]}h
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between mt-4 text-xs text-gray-500">
+                <span>0h</span>
+                <span>12h</span>
+              </div>
+            </div>
+
+            {/* Análise */}
+            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <h3 className="mb-2 font-semibold text-gray-900">💡 Análise da Disponibilidade</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-700">Total de tempo disponível por dia:</span>
+                  <span className="text-gray-700">Dias de estudo na semana:</span>
                   <span className="font-bold text-blue-600">
-                    {(configuracoes.horasPorDia * 60).toFixed(0)} minutos
+                    {contarDiasComHoras()} {contarDiasComHoras() === 1 ? 'dia' : 'dias'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-700">Tempo planejado para disciplinas:</span>
+                  <span className="text-gray-700">Total de horas semanais:</span>
                   <span className="font-bold text-blue-600">
-                    {configuracoes.disciplinasPorDia * configuracoes.tempoPorDisciplina} minutos
+                    {calcularTotalHorasSemana()}h
                   </span>
                 </div>
-                <div className="flex justify-between pt-2 mt-2 border-t border-blue-300">
-                  <span className="font-medium text-gray-700">Tempo livre (intervalos/revisão):</span>
-                  <span className={`font-bold ${
-                    calcularTempoDisponivel() >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {calcularTempoDisponivel()} minutos
+                <div className="flex justify-between">
+                  <span className="text-gray-700">Média de horas por dia útil:</span>
+                  <span className="font-bold text-blue-600">
+                    {calcularMediaHorasDia()}h
                   </span>
                 </div>
                 
-                {calcularTempoDisponivel() < 0 && (
+                {contarDiasComHoras() === 0 && (
                   <div className="p-3 mt-3 text-xs text-red-700 border border-red-200 rounded bg-red-50">
-                    ⚠️ Atenção: O tempo planejado excede o tempo disponível! Ajuste as configurações.
+                    ⚠️ Configure pelo menos 1 dia com horas de estudo para criar seu cronograma.
                   </div>
                 )}
                 
-                {calcularTempoDisponivel() >= 0 && calcularTempoDisponivel() < 30 && (
+                {contarDiasComHoras() > 0 && parseFloat(calcularTotalHorasSemana()) < 10 && (
                   <div className="p-3 mt-3 text-xs text-yellow-700 border border-yellow-200 rounded bg-yellow-50">
-                    ⚠️ Pouco tempo livre. Considere reduzir disciplinas ou aumentar tempo disponível.
+                    ⚠️ Atenção: Menos de 10 horas semanais pode dificultar o progresso nos estudos.
                   </div>
                 )}
                 
-                {calcularTempoDisponivel() >= 30 && (
+                {parseFloat(calcularTotalHorasSemana()) >= 10 && parseFloat(calcularTotalHorasSemana()) <= 40 && (
                   <div className="p-3 mt-3 text-xs text-green-700 border border-green-200 rounded bg-green-50">
-                    ✓ Ótimo! Você terá tempo para intervalos e revisões.
+                    ✓ Excelente! Uma carga horária equilibrada e sustentável.
+                  </div>
+                )}
+                
+                {parseFloat(calcularTotalHorasSemana()) > 40 && (
+                  <div className="p-3 mt-3 text-xs text-orange-700 border border-orange-200 rounded bg-orange-50">
+                    ⚠️ Cuidado: Muitas horas pode levar ao esgotamento. Reserve tempo para descanso.
                   </div>
                 )}
               </div>
@@ -325,7 +469,7 @@ export const ConfiguracoesEstudo = () => {
             </button>
             <button
               type="submit"
-              disabled={salvando || calcularTempoDisponivel() < 0}
+              disabled={salvando || contarDiasComHoras() === 0}
               className="flex-1 px-6 py-2 font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {salvando ? 'Salvando...' : '💾 Salvar Configurações'}
@@ -343,19 +487,19 @@ export const ConfiguracoesEstudo = () => {
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-green-600">✓</span>
-              <span>Deixe sempre um tempo livre para revisões e imprevistos (mínimo 30 min)</span>
+              <span>Distribua as horas de forma equilibrada ao longo da semana</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-green-600">✓</span>
-              <span>Variar disciplinas no mesmo dia ajuda a manter o foco e evitar fadiga mental</span>
+              <span>Evite concentrar todo o estudo em poucos dias - a constância é mais efetiva</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-green-600">✓</span>
-              <span>60-90 minutos por disciplina é o tempo ideal para absorção efetiva</span>
+              <span>Reserve pelo menos 1 dia de descanso completo por semana</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-green-600">✓</span>
-              <span>Estudar 5-6 dias por semana com 1-2 dias de descanso é mais sustentável</span>
+              <span>Entre 2 a 6 horas por dia é considerado o tempo ideal para a maioria dos estudantes</span>
             </li>
           </ul>
         </div>

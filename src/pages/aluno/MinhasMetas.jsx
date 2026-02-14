@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { buscarMetasAluno, buscarMetasPorMes, concluirMeta, desconcluirMeta } from '../../services/metaService';
+import { reagendarMetaProximoDiaLivre } from '../../services/reagendamentoService';
+import ModalMetaComComentarios from '../../components/ModalMetaComComentarios';
 
 export const MinhasMetas = () => {
   const navigate = useNavigate();
@@ -14,6 +16,22 @@ export const MinhasMetas = () => {
   const [filtro, setFiltro] = useState('todas');
   const [metasAtrasadas, setMetasAtrasadas] = useState(0);
 
+  // ✅ NOVOS: Estados para organização de metas
+  const [secoesExpandidas, setSecoesExpandidas] = useState({
+    atrasadas: true,
+    hoje: true,
+    amanha: true,
+    semana: true,
+    futuro: false
+  });
+  const [limitePorSecao, setLimitePorSecao] = useState({
+    atrasadas: 5,
+    hoje: 10,
+    amanha: 5,
+    semana: 5,
+    futuro: 5
+  });
+
   // Estados do calendário
   const [mesAtual, setMesAtual] = useState(new Date().getMonth());
   const [anoAtual, setAnoAtual] = useState(new Date().getFullYear());
@@ -22,6 +40,12 @@ export const MinhasMetas = () => {
   // Estados do modal
   const [metaSelecionada, setMetaSelecionada] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
+  const [reagendando, setReagendando] = useState(false);
+  
+  // ✅ NOVOS: Estados para modal de dia completo
+  const [diaExpandido, setDiaExpandido] = useState(null);
+  const [modalDiaAberto, setModalDiaAberto] = useState(false);
+  const [metasDoDiaExpandido, setMetasDoDiaExpandido] = useState([]);
 
   useEffect(() => {
     if (visualizacao === 'lista') {
@@ -105,6 +129,68 @@ export const MinhasMetas = () => {
     setMetasFiltradas(filtradas);
   };
 
+  // ✅ NOVAS: Funções para organização
+  const toggleSecao = (secao) => {
+    setSecoesExpandidas(prev => ({
+      ...prev,
+      [secao]: !prev[secao]
+    }));
+  };
+
+  const verMais = (secao) => {
+    setLimitePorSecao(prev => ({
+      ...prev,
+      [secao]: prev[secao] + 10
+    }));
+  };
+
+  const agruparMetasPorPeriodo = (metas) => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    
+    const fimSemana = new Date(hoje);
+    fimSemana.setDate(fimSemana.getDate() + 7);
+
+    const grupos = {
+      atrasadas: [],
+      hoje: [],
+      amanha: [],
+      semana: [],
+      futuro: []
+    };
+
+    metas.forEach(meta => {
+      const dataMeta = meta.dataProgramada.toDate();
+      dataMeta.setHours(0, 0, 0, 0);
+
+      if (!meta.concluida && dataMeta < hoje) {
+        grupos.atrasadas.push(meta);
+      } else if (dataMeta.getTime() === hoje.getTime()) {
+        grupos.hoje.push(meta);
+      } else if (dataMeta.getTime() === amanha.getTime()) {
+        grupos.amanha.push(meta);
+      } else if (dataMeta > amanha && dataMeta <= fimSemana) {
+        grupos.semana.push(meta);
+      } else {
+        grupos.futuro.push(meta);
+      }
+    });
+
+    // Ordenar cada grupo por data
+    Object.keys(grupos).forEach(chave => {
+      grupos[chave].sort((a, b) => {
+        const dataA = a.dataProgramada.toDate();
+        const dataB = b.dataProgramada.toDate();
+        return dataA - dataB;
+      });
+    });
+
+    return grupos;
+  };
+
   const handleConcluir = async (metaId) => {
     const resultado = await concluirMeta(metaId);
     
@@ -131,6 +217,46 @@ export const MinhasMetas = () => {
     }
   };
 
+  // ✅ NOVA: Reagendar meta (para usar na lista e calendário)
+  const handleReagendar = async (metaId, event) => {
+    if (event) event.stopPropagation();
+    
+    const confirmacao = window.confirm(
+      '⏰ Precisa de mais tempo?\n\n' +
+      'A meta será reagendada para o próximo dia livre.'
+    );
+    
+    if (!confirmacao) return;
+    
+    setReagendando(true);
+    
+    const resultado = await reagendarMetaProximoDiaLivre(metaId, usuario.uid);
+    
+    if (resultado.sucesso) {
+      const novaData = resultado.novaData.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        weekday: 'long'
+      });
+      
+      alert(
+        `✅ Reagendada!\n\n` +
+        `Nova data: ${novaData}\n` +
+        `Espaço: ${Math.floor(resultado.espacoDisponivel / 60)}h`
+      );
+      
+      if (visualizacao === 'lista') {
+        carregarMetas();
+      } else {
+        carregarMetasCalendario();
+      }
+    } else {
+      alert('❌ Erro: ' + resultado.erro);
+    }
+    
+    setReagendando(false);
+  };
+
   const abrirModal = (meta) => {
     setMetaSelecionada(meta);
     setModalAberto(true);
@@ -139,6 +265,11 @@ export const MinhasMetas = () => {
   const fecharModal = () => {
     setModalAberto(false);
     setMetaSelecionada(null);
+    if (visualizacao === 'lista') {
+      carregarMetas();
+    } else {
+      carregarMetasCalendario();
+    }
   };
 
   const formatarData = (timestamp) => {
@@ -232,6 +363,21 @@ export const MinhasMetas = () => {
            anoAtual === hoje.getFullYear();
   };
 
+  // ✅ NOVAS: Funções para modal de dia completo
+  const abrirModalDia = (dia, event) => {
+    if (event) event.stopPropagation();
+    const metas = getMetasDoDia(dia);
+    setDiaExpandido(dia);
+    setMetasDoDiaExpandido(metas);
+    setModalDiaAberto(true);
+  };
+
+  const fecharModalDia = () => {
+    setModalDiaAberto(false);
+    setDiaExpandido(null);
+    setMetasDoDiaExpandido([]);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
@@ -249,7 +395,7 @@ export const MinhasMetas = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setVisualizacao('lista')}
-              className={`px-4 py-2 rounded-lg transition ${
+              className={`px-4 py-2 rounded-lg font-medium transition ${
                 visualizacao === 'lista'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -259,7 +405,7 @@ export const MinhasMetas = () => {
             </button>
             <button
               onClick={() => setVisualizacao('calendario')}
-              className={`px-4 py-2 rounded-lg transition ${
+              className={`px-4 py-2 rounded-lg font-medium transition ${
                 visualizacao === 'calendario'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -272,267 +418,367 @@ export const MinhasMetas = () => {
       </header>
 
       <div className="px-4 py-8 mx-auto max-w-7xl">
+        {/* Alerta de metas atrasadas */}
         {metasAtrasadas > 0 && visualizacao === 'lista' && (
           <div className="p-4 mb-6 border border-red-200 rounded-lg bg-red-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⚠️</span>
-                <div>
-                  <h3 className="font-semibold text-red-800">
-                    Você tem {metasAtrasadas} meta{metasAtrasadas > 1 ? 's' : ''} atrasada{metasAtrasadas > 1 ? 's' : ''}
-                  </h3>
-                  <p className="text-sm text-red-600">
-                    Reprograme suas metas para voltar ao ritmo!
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigate('/aluno/reprogramar-metas')}
-                className="px-4 py-2 font-medium text-white transition bg-red-600 rounded-lg hover:bg-red-700"
-              >
-                📅 Reprogramar Metas
-              </button>
-            </div>
+            <p className="font-medium text-red-800">
+              🚨 Você tem <strong>{metasAtrasadas}</strong> meta{metasAtrasadas > 1 ? 's' : ''} atrasada{metasAtrasadas > 1 ? 's' : ''}!
+            </p>
           </div>
         )}
 
         {/* VISUALIZAÇÃO LISTA */}
         {visualizacao === 'lista' && (
-          <>
-            <div className="grid gap-4 mb-6 md:grid-cols-4">
-              <div className="p-4 bg-white rounded-lg shadow">
-                <p className="text-sm text-gray-600">Total de Metas</p>
-                <p className="mt-1 text-3xl font-bold text-gray-800">{metas.length}</p>
-              </div>
-
-              <div className="p-4 bg-white rounded-lg shadow">
-                <p className="text-sm text-gray-600">Pendentes</p>
-                <p className="mt-1 text-3xl font-bold text-blue-600">
-                  {metas.filter(m => !m.concluida).length}
-                </p>
-              </div>
-
-              <div className="p-4 bg-white rounded-lg shadow">
-                <p className="text-sm text-gray-600">Concluídas</p>
-                <p className="mt-1 text-3xl font-bold text-green-600">
-                  {metas.filter(m => m.concluida).length}
-                </p>
-              </div>
-
-              <div className="p-4 bg-white rounded-lg shadow">
-                <p className="text-sm text-gray-600">Atrasadas</p>
-                <p className="mt-1 text-3xl font-bold text-red-600">{metasAtrasadas}</p>
-              </div>
-            </div>
-
-            <div className="p-4 mb-6 bg-white rounded-lg shadow">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setFiltro('todas')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    filtro === 'todas'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Todas
-                </button>
-                <button
-                  onClick={() => setFiltro('pendentes')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    filtro === 'pendentes'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Pendentes
-                </button>
-                <button
-                  onClick={() => setFiltro('atrasadas')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    filtro === 'atrasadas'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Atrasadas
-                </button>
-                <button
-                  onClick={() => setFiltro('concluidas')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    filtro === 'concluidas'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Concluídas
-                </button>
-              </div>
-            </div>
-
-            {carregando ? (
-              <div className="p-8 bg-white rounded-lg shadow">
-                <div className="text-center">
-                  <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
-                  <p className="mt-4 text-gray-600">Carregando metas...</p>
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <h2 className="text-xl font-semibold text-gray-800">Todas as Metas</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFiltro('todas')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filtro === 'todas'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  <button
+                    onClick={() => setFiltro('pendentes')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filtro === 'pendentes'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Pendentes
+                  </button>
+                  <button
+                    onClick={() => setFiltro('concluidas')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filtro === 'concluidas'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Concluídas
+                  </button>
+                  <button
+                    onClick={() => setFiltro('atrasadas')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filtro === 'atrasadas'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Atrasadas
+                  </button>
                 </div>
               </div>
-            ) : metasFiltradas.length === 0 ? (
-              <div className="p-8 bg-white rounded-lg shadow">
-                <p className="text-center text-gray-600">Nenhuma meta encontrada neste filtro</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {metasFiltradas.map((meta) => {
-                  const atrasada = verificarAtrasada(meta);
+            </div>
 
-                  return (
-                    <div
-                      key={meta.id}
-                      className={`bg-white rounded-lg shadow p-6 ${
-                        atrasada ? 'border-l-4 border-red-500' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-800">
-                              {meta.assuntoTitulo}
-                            </h3>
-                            {atrasada && (
-                              <span className="px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full">
-                                Atrasada
-                              </span>
-                            )}
-                            {meta.concluida && (
-                              <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                                ✓ Concluída
-                              </span>
-                            )}
-                          </div>
+            <div className="p-6">
+              {carregando ? (
+                <div className="py-8 text-center">
+                  <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
+                  <p className="mt-4 text-gray-600">Carregando...</p>
+                </div>
+              ) : metasFiltradas.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-gray-600">Nenhuma meta encontrada</p>
+                </div>
+              ) : (
+                <div>
+                  {(() => {
+                    const grupos = agruparMetasPorPeriodo(metasFiltradas);
+                    
+                    // Componente de renderização de seção
+                    const RenderSecao = ({ titulo, icone, metas, secao, cor }) => {
+                      if (metas.length === 0) return null;
 
-                          {meta.observacoes && (
-                            <p className="mb-3 text-sm text-gray-600">{meta.observacoes}</p>
-                          )}
+                      const expandida = secoesExpandidas[secao];
+                      const limite = limitePorSecao[secao];
+                      const metasVisiveis = metas.slice(0, limite);
+                      const temMais = metas.length > limite;
 
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div>
-                              <span>📅 Data: </span>
-                              <span className="font-medium">{formatarData(meta.dataProgramada)}</span>
+                      return (
+                        <div className="mb-4">
+                          {/* Header da Seção */}
+                          <button
+                            onClick={() => toggleSecao(secao)}
+                            className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition ${
+                              cor === 'red' ? 'bg-red-50 border-red-200 hover:bg-red-100' :
+                              cor === 'blue' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
+                              cor === 'orange' ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' :
+                              cor === 'purple' ? 'bg-purple-50 border-purple-200 hover:bg-purple-100' :
+                              'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{icone}</span>
+                              <div className="text-left">
+                                <h3 className={`font-semibold ${
+                                  cor === 'red' ? 'text-red-800' :
+                                  cor === 'blue' ? 'text-blue-800' :
+                                  cor === 'orange' ? 'text-orange-800' :
+                                  cor === 'purple' ? 'text-purple-800' :
+                                  'text-gray-800'
+                                }`}>
+                                  {titulo}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  {metas.filter(m => !m.concluida).length} pendentes • {metas.filter(m => m.concluida).length} concluídas
+                                </p>
+                              </div>
                             </div>
-                            {meta.tipoEstudo && (
-                              <div>
-                                <span>📚 Tipo: </span>
-                                <span>{meta.tipoEstudo}</span>
-                              </div>
-                            )}
-                            {meta.tempoEstimado > 0 && (
-                              <div>
-                                <span>⏱️ Tempo: </span>
-                                <span>{meta.tempoEstimado}h</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                cor === 'red' ? 'bg-red-200 text-red-800' :
+                                cor === 'blue' ? 'bg-blue-200 text-blue-800' :
+                                cor === 'orange' ? 'bg-orange-200 text-orange-800' :
+                                cor === 'purple' ? 'bg-purple-200 text-purple-800' :
+                                'bg-gray-200 text-gray-800'
+                              }`}>
+                                {metas.length}
+                              </span>
+                              <svg 
+                                className={`w-5 h-5 transition-transform ${expandida ? 'rotate-180' : ''}`}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </button>
 
-                        {!meta.concluida ? (
-                          <button
-                            onClick={() => handleConcluir(meta.id)}
-                            className="px-4 py-2 text-sm text-white transition bg-green-600 rounded-lg hover:bg-green-700"
-                          >
-                            ✓ Concluir
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleDesconcluir(meta.id)}
-                            className="px-4 py-2 text-sm text-white transition bg-gray-400 rounded-lg hover:bg-gray-500"
-                          >
-                            ↻ Reabrir
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
+                          {/* Lista de Metas */}
+                          {expandida && (
+                            <div className="mt-2 space-y-2">
+                              {metasVisiveis.map(meta => {
+                                const atrasada = verificarAtrasada(meta);
+
+                                return (
+                                  <div
+                                    key={meta.id}
+                                    onClick={() => abrirModal(meta)}
+                                    className={`border rounded-lg p-4 transition cursor-pointer ${
+                                      meta.concluida
+                                        ? 'bg-green-50 border-green-200'
+                                        : atrasada
+                                        ? 'bg-red-50 border-red-200'
+                                        : 'bg-white border-gray-200 hover:shadow-md'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      {/* ✅ Indicador visual (não clicável) */}
+                                      <div className="flex-shrink-0 mt-1">
+                                        {meta.concluida ? (
+                                          <span className="flex items-center justify-center w-5 h-5 text-white bg-green-600 rounded-full">
+                                            ✓
+                                          </span>
+                                        ) : (
+                                          <span className="flex items-center justify-center w-5 h-5 border-2 border-gray-400 rounded-full">
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex-1">
+                                        <p className={`font-medium ${
+                                          meta.concluida ? 'text-green-700 line-through' : 'text-gray-800'
+                                        }`}>
+                                          {meta.assuntoTitulo || meta.assuntoId}
+                                        </p>
+                                        <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-600">
+                                          <span>📅 {formatarData(meta.dataProgramada)}</span>
+                                          <span>⏱ {meta.tempoEstimado} min</span>
+                                          <span className="capitalize">📚 {meta.tipoEstudo}</span>
+                                        </div>
+                                        {meta.observacoes && (
+                                          <p className="mt-2 text-sm text-gray-600">{meta.observacoes}</p>
+                                        )}
+                                      </div>
+                                      {/* ✅ NOVO: Botão Reagendar */}
+                                      {!meta.concluida && (
+                                        <button
+                                          onClick={(e) => handleReagendar(meta.id, e)}
+                                          disabled={reagendando}
+                                          className="px-3 py-1.5 text-xs font-semibold text-white transition bg-orange-600 rounded-lg hover:bg-orange-700 disabled:bg-gray-400"
+                                        >
+                                          ⏰
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Botão Ver Mais */}
+                              {temMais && (
+                                <button
+                                  onClick={() => verMais(secao)}
+                                  className="w-full py-2 text-sm font-medium text-blue-600 transition border border-blue-200 rounded-lg hover:bg-blue-50"
+                                >
+                                  Ver mais {metas.length - limite} metas ▼
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+                    
+                    return (
+                      <>
+                        <RenderSecao 
+                          titulo="🚨 Atrasadas"
+                          icone="🔴"
+                          metas={grupos.atrasadas}
+                          secao="atrasadas"
+                          cor="red"
+                        />
+                        
+                        <RenderSecao 
+                          titulo="⚡ Hoje"
+                          icone="📍"
+                          metas={grupos.hoje}
+                          secao="hoje"
+                          cor="blue"
+                        />
+                        
+                        <RenderSecao 
+                          titulo="📅 Amanhã"
+                          icone="➡️"
+                          metas={grupos.amanha}
+                          secao="amanha"
+                          cor="orange"
+                        />
+                        
+                        <RenderSecao 
+                          titulo="📆 Esta Semana"
+                          icone="📊"
+                          metas={grupos.semana}
+                          secao="semana"
+                          cor="purple"
+                        />
+                        
+                        <RenderSecao 
+                          titulo="🔮 Futuro"
+                          icone="🗓️"
+                          metas={grupos.futuro}
+                          secao="futuro"
+                          cor="gray"
+                        />
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* VISUALIZAÇÃO CALENDÁRIO */}
         {visualizacao === 'calendario' && (
-          <div className="p-6 bg-white rounded-lg shadow">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-lg shadow">
+            {/* Navegação do Calendário */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <button
                 onClick={mesAnterior}
-                className="px-4 py-2 transition bg-gray-200 rounded-lg hover:bg-gray-300"
+                className="p-2 text-gray-600 transition rounded-lg hover:bg-gray-100"
               >
-                ← Anterior
+                ←
               </button>
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-xl font-semibold text-gray-800">
                 {getNomeMes()} {anoAtual}
               </h2>
               <button
                 onClick={proximoMes}
-                className="px-4 py-2 transition bg-gray-200 rounded-lg hover:bg-gray-300"
+                className="p-2 text-gray-600 transition rounded-lg hover:bg-gray-100"
               >
-                Próximo →
+                →
               </button>
             </div>
 
-            {carregando ? (
-              <div className="py-8 text-center">
-                <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
-                <p className="mt-4 text-gray-600">Carregando calendário...</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-7 gap-2 mb-2">
+            {/* Grid do Calendário */}
+            <div className="p-6">
+              {carregando ? (
+                <div className="py-8 text-center">
+                  <div className="w-12 h-12 mx-auto border-b-2 border-blue-600 rounded-full animate-spin"></div>
+                  <p className="mt-4 text-gray-600">Carregando...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-7 gap-2">
+                  {/* Cabeçalho dos dias da semana */}
                   {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(dia => (
-                    <div key={dia} className="text-sm font-semibold text-center text-gray-600">
+                    <div key={dia} className="py-2 text-sm font-semibold text-center text-gray-600">
                       {dia}
                     </div>
                   ))}
-                </div>
 
-                <div className="grid grid-cols-7 gap-2">
+                  {/* Dias do mês */}
                   {getDiasDoMes().map((dia, index) => {
                     const metasDoDia = getMetasDoDia(dia);
-                    const hoje = ehHoje(dia);
+                    const isHoje = ehHoje(dia);
 
                     return (
                       <div
                         key={index}
-                        className={`min-h-24 p-2 border rounded-lg ${
-                          !dia ? 'bg-gray-50' : 'bg-white hover:bg-gray-50'
-                        } ${hoje ? 'border-blue-500 border-2' : 'border-gray-200'}`}
+                        className={`min-h-[120px] p-2 border rounded-lg ${
+                          !dia
+                            ? 'bg-gray-50'
+                            : isHoje
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 bg-white hover:shadow-md transition'
+                        }`}
                       >
                         {dia && (
                           <>
                             <div className={`text-sm font-semibold mb-1 ${
-                              hoje ? 'text-blue-600' : 'text-gray-700'
+                              isHoje ? 'text-blue-600' : 'text-gray-700'
                             }`}>
                               {dia}
                             </div>
+                            
+                            {/* Metas do dia */}
                             <div className="space-y-1">
-                              {metasDoDia.map(meta => (
+                              {metasDoDia.slice(0, 3).map(meta => (
                                 <div
                                   key={meta.id}
-                                  className={`text-xs p-1 rounded cursor-pointer hover:opacity-80 transition ${
+                                  onClick={() => abrirModal(meta)}
+                                  className={`text-xs p-1.5 rounded cursor-pointer ${
                                     meta.concluida
-                                      ? 'bg-green-100 text-green-700'
+                                      ? 'bg-green-100 text-green-700 line-through'
                                       : verificarAtrasada(meta)
                                       ? 'bg-red-100 text-red-700'
-                                      : 'bg-blue-100 text-blue-700'
+                                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                   }`}
-                                  onClick={() => abrirModal(meta)}
-                                  title={meta.assuntoTitulo}
                                 >
-                                  {meta.concluida ? '✓ ' : ''}
-                                  {meta.assuntoTitulo.substring(0, 15)}
-                                  {meta.assuntoTitulo.length > 15 ? '...' : ''}
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="flex-1 truncate">
+                                      {meta.assuntoTitulo || meta.assuntoId}
+                                    </span>
+                                    {/* ✅ NOVO: Ícone de reagendar no calendário */}
+                                    {!meta.concluida && (
+                                      <button
+                                        onClick={(e) => handleReagendar(meta.id, e)}
+                                        className="flex-shrink-0 transition hover:scale-125"
+                                        title="Reagendar"
+                                      >
+                                        ⏰
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
+                              {metasDoDia.length > 3 && (
+                                <button
+                                  onClick={(e) => abrirModalDia(dia, e)}
+                                  className="w-full py-1 mt-1 text-xs font-medium text-blue-600 transition rounded hover:bg-blue-100 hover:text-blue-700"
+                                >
+                                  +{metasDoDia.length - 3} metas
+                                </button>
+                              )}
                             </div>
                           </>
                         )}
@@ -540,154 +786,139 @@ export const MinhasMetas = () => {
                     );
                   })}
                 </div>
-
-                <div className="flex items-center justify-center gap-6 mt-6 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-100 rounded"></div>
-                    <span>Pendente</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-green-100 rounded"></div>
-                    <span>Concluída</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-red-100 rounded"></div>
-                    <span>Atrasada</span>
-                  </div>
-                </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* MODAL DE DETALHES DA META */}
-      {modalAberto && metaSelecionada && (
+      {/* ✅ NOVO: Modal de Metas do Dia Completo */}
+      {modalDiaAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Header do Modal */}
+            {/* Header */}
             <div className="sticky top-0 flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-800">Detalhes da Meta</h2>
+              <h3 className="text-xl font-bold text-gray-800">
+                📅 Metas do dia {diaExpandido} de {getNomeMes()}
+              </h3>
               <button
-                onClick={fecharModal}
-                className="text-gray-400 transition hover:text-gray-600"
+                onClick={fecharModalDia}
+                className="text-2xl leading-none text-gray-400 hover:text-gray-600"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                ×
               </button>
             </div>
 
-            {/* Conteúdo do Modal */}
-            <div className="p-6">
-              {/* Status Badge */}
-              <div className="flex items-center gap-3 mb-4">
-                {metaSelecionada.concluida ? (
-                  <span className="px-3 py-1 text-sm font-medium text-green-700 bg-green-100 rounded-full">
-                    ✓ Meta Concluída
-                  </span>
-                ) : verificarAtrasada(metaSelecionada) ? (
-                  <span className="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 rounded-full">
-                    ⚠️ Meta Atrasada
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 rounded-full">
-                    📋 Meta Pendente
-                  </span>
-                )}
-              </div>
+            {/* Lista de Metas */}
+            <div className="p-6 space-y-3">
+              {metasDoDiaExpandido.length === 0 ? (
+                <p className="text-center text-gray-500">Nenhuma meta neste dia</p>
+              ) : (
+                metasDoDiaExpandido.map(meta => {
+                  const atrasada = verificarAtrasada(meta);
+                  
+                  return (
+                    <div
+                      key={meta.id}
+                      className={`border rounded-lg p-4 ${
+                        meta.concluida
+                          ? 'bg-green-50 border-green-200'
+                          : atrasada
+                          ? 'bg-red-50 border-red-200'
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* ✅ Indicador visual (não clicável) */}
+                        <div className="flex-shrink-0 mt-1">
+                          {meta.concluida ? (
+                            <span className="flex items-center justify-center w-5 h-5 text-white bg-green-600 rounded-full">
+                              ✓
+                            </span>
+                          ) : (
+                            <span className="flex items-center justify-center w-5 h-5 border-2 border-gray-400 rounded-full">
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1">
+                          <p className={`font-medium ${
+                            meta.concluida ? 'text-green-700 line-through' : 'text-gray-800'
+                          }`}>
+                            {meta.assuntoTitulo || meta.assuntoId}
+                          </p>
+                          <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-600">
+                            <span>📅 {formatarData(meta.dataProgramada)}</span>
+                            <span>⏱ {meta.tempoEstimado} min</span>
+                            <span className="capitalize">📚 {meta.tipoEstudo}</span>
+                          </div>
+                          {meta.observacoes && (
+                            <p className="mt-2 text-sm text-gray-600">{meta.observacoes}</p>
+                          )}
+                        </div>
 
-              {/* Título */}
-              <h3 className="mb-4 text-2xl font-bold text-gray-800">
-                {metaSelecionada.assuntoTitulo}
-              </h3>
+                        <div className="flex flex-col gap-2">
+                          {/* Botão Ver Detalhes */}
+                          <button
+                            onClick={() => {
+                              fecharModalDia();
+                              abrirModal(meta);
+                            }}
+                            className="px-3 py-1.5 text-xs font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700"
+                            title="Ver detalhes e comentários"
+                          >
+                            👁️ Ver
+                          </button>
+                          
+                          {/* Botão Reagendar */}
+                          {!meta.concluida && (
+                            <button
+                              onClick={(e) => {
+                                fecharModalDia();
+                                handleReagendar(meta.id, e);
+                              }}
+                              disabled={reagendando}
+                              className="px-3 py-1.5 text-xs font-semibold text-white transition bg-orange-600 rounded-lg hover:bg-orange-700 disabled:bg-gray-400"
+                              title="Preciso de mais tempo"
+                            >
+                              ⏰
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-              {/* Informações */}
-              <div className="mb-6 space-y-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">📅</span>
-                  <div>
-                    <p className="text-sm text-gray-600">Data Programada</p>
-                    <p className="text-lg font-semibold text-gray-800">
-                      {formatarDataCompleta(metaSelecionada.dataProgramada)}
-                    </p>
-                  </div>
+            {/* Footer com Estatísticas */}
+            <div className="sticky bottom-0 px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-gray-700">
+                  Total: {metasDoDiaExpandido.length} metas
+                </span>
+                <div className="flex gap-4">
+                  <span className="text-green-600">
+                    ✅ {metasDoDiaExpandido.filter(m => m.concluida).length} concluídas
+                  </span>
+                  <span className="text-orange-600">
+                    ⏳ {metasDoDiaExpandido.filter(m => !m.concluida).length} pendentes
+                  </span>
                 </div>
-
-                {metaSelecionada.tipoEstudo && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">📚</span>
-                    <div>
-                      <p className="text-sm text-gray-600">Tipo de Estudo</p>
-                      <p className="text-lg font-semibold text-gray-800">
-                        {metaSelecionada.tipoEstudo}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {metaSelecionada.tempoEstimado > 0 && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">⏱️</span>
-                    <div>
-                      <p className="text-sm text-gray-600">Tempo Estimado</p>
-                      <p className="text-lg font-semibold text-gray-800">
-                        {metaSelecionada.tempoEstimado} minuto{metaSelecionada.tempoEstimado > 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {metaSelecionada.observacoes && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">📝</span>
-                    <div>
-                      <p className="text-sm text-gray-600">Observações</p>
-                      <p className="mt-1 text-gray-800">{metaSelecionada.observacoes}</p>
-                    </div>
-                  </div>
-                )}
-
-                {metaSelecionada.concluida && metaSelecionada.dataConclusao && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">✅</span>
-                    <div>
-                      <p className="text-sm text-gray-600">Data de Conclusão</p>
-                      <p className="text-lg font-semibold text-green-600">
-                        {formatarDataCompleta(metaSelecionada.dataConclusao)}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Botões de Ação */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                {!metaSelecionada.concluida ? (
-                  <button
-                    onClick={() => handleConcluir(metaSelecionada.id)}
-                    className="flex-1 px-6 py-3 font-semibold text-white transition bg-green-600 rounded-lg hover:bg-green-700"
-                  >
-                    ✓ Marcar como Concluída
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleDesconcluir(metaSelecionada.id)}
-                    className="flex-1 px-6 py-3 font-semibold text-white transition bg-gray-400 rounded-lg hover:bg-gray-500"
-                  >
-                    ↻ Reabrir Meta
-                  </button>
-                )}
-                <button
-                  onClick={fecharModal}
-                  className="px-6 py-3 font-semibold text-gray-700 transition bg-gray-200 rounded-lg hover:bg-gray-300"
-                >
-                  Fechar
-                </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal */}
+      {modalAberto && metaSelecionada && (
+        <ModalMetaComComentarios
+          meta={metaSelecionada}
+          onClose={fecharModal}
+          onAtualizar={fecharModal}
+        />
       )}
     </div>
   );

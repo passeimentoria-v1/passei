@@ -21,6 +21,12 @@ export const CriarMetas = () => {
   const [alunoSelecionado, setAlunoSelecionado] = useState(null);
   const [cursoSelecionado, setCursoSelecionado] = useState(null);
   const [assuntosSelecionados, setAssuntosSelecionados] = useState([]);
+  
+  // ✅ NOVO: Estado para controlar disciplinas expandidas
+  const [disciplinasExpandidas, setDisciplinasExpandidas] = useState([]);
+  
+  // ✅ NOVO: Estado para feedback visual dos botões
+  const [feedbackBotao, setFeedbackBotao] = useState(null);
 
   const [dataInicio, setDataInicio] = useState('');
   const [tipoEstudo, setTipoEstudo] = useState('regular');
@@ -31,10 +37,29 @@ export const CriarMetas = () => {
   const [modoDistribuicao, setModoDistribuicao] = useState('automatico');
   const [distribuicao, setDistribuicao] = useState(null);
   const [mostrarPreview, setMostrarPreview] = useState(false);
+  
+  // ✅ NOVOS: Restrições de distribuição
+  const [maxDisciplinasPorDia, setMaxDisciplinasPorDia] = useState(null);
+  const [tempoMaxPorDisciplina, setTempoMaxPorDisciplina] = useState(null);
+  const [usarRestricoes, setUsarRestricoes] = useState(false);
 
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
+
+  // Helper para calcular dias com horas
+  const calcularDiasComHoras = () => {
+    if (!configAluno || !configAluno.horasPorDia) return 0;
+    return Object.values(configAluno.horasPorDia).filter(h => h > 0).length;
+  };
+
+  // Helper para calcular total de horas semanais
+  const calcularTotalHorasSemana = () => {
+    if (!configAluno || !configAluno.horasPorDia) return 0;
+    return Object.values(configAluno.horasPorDia)
+      .reduce((total, horas) => total + horas, 0)
+      .toFixed(1);
+  };
 
   useEffect(() => {
     carregarAlunos();
@@ -63,11 +88,27 @@ export const CriarMetas = () => {
   };
 
   const carregarConfig = async () => {
+    console.log('🔧 Carregando configurações do aluno:', alunoSelecionado);
     const resultado = await buscarConfiguracoesEstudo(alunoSelecionado);
-    setConfigAluno(resultado.sucesso ? resultado.configuracoes : {
-      diasPorSemana: 5,
-      horasPorDia: 4
-    });
+    
+    if (resultado.sucesso && resultado.configuracoes) {
+      console.log('✅ Configurações carregadas:', resultado.configuracoes);
+      setConfigAluno(resultado.configuracoes);
+    } else {
+      console.log('⚠️ Sem configurações, usando padrão');
+      // Configurações padrão
+      setConfigAluno({
+        horasPorDia: {
+          segunda: 4,
+          terca: 4,
+          quarta: 4,
+          quinta: 4,
+          sexta: 4,
+          sabado: 0,
+          domingo: 0
+        }
+      });
+    }
   };
 
   const carregarDisciplinas = async (cursoId) => {
@@ -85,6 +126,10 @@ export const CriarMetas = () => {
 
   const carregarAssuntosDisciplina = async (cursoId, disciplinaId) => {
     try {
+      // ✅ Buscar nome da disciplina
+      const disciplina = disciplinas.find(d => d.id === disciplinaId);
+      const disciplinaNome = disciplina?.nome || disciplina?.titulo || '';
+      
       const ref = collection(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`);
       const q = query(ref, orderBy('ordem', 'asc'));
       const snapshot = await getDocs(q);
@@ -92,7 +137,12 @@ export const CriarMetas = () => {
       snapshot.forEach(doc => {
         const data = doc.data();
         if (!data.oculto) {
-          lista.push({ id: doc.id, disciplinaId, ...data });
+          lista.push({ 
+            id: doc.id, 
+            disciplinaId,
+            disciplinaNome, // ✅ ADICIONADO: Nome da disciplina
+            ...data 
+          });
         }
       });
       return lista;
@@ -102,18 +152,86 @@ export const CriarMetas = () => {
     }
   };
 
+  // ✅ NOVO: Selecionar aluno e auto-selecionar seu curso
+  const handleSelecionarAluno = async (alunoId) => {
+    setAlunoSelecionado(alunoId);
+    
+    // Auto-selecionar o curso do aluno
+    if (alunoId) {
+      const aluno = alunos.find(a => a.id === alunoId);
+      if (aluno && aluno.cursoId) {
+        console.log('✅ Auto-selecionando curso do aluno:', aluno.cursoId);
+        await handleSelecionarCurso(aluno.cursoId);
+      }
+    } else {
+      // Limpar curso se deselecionar aluno
+      setCursoSelecionado(null);
+      setDisciplinas([]);
+      setAssuntos([]);
+    }
+  };
+
   const handleSelecionarCurso = async (cursoId) => {
     setCursoSelecionado(cursoId);
     setCarregando(true);
+    
+    // Carregar disciplinas
     await carregarDisciplinas(cursoId);
+    
+    // ✅ NOVO: Carregar TODOS os assuntos de TODAS as disciplinas
+    await carregarTodosAssuntos(cursoId);
+    
     setCarregando(false);
   };
 
+  // ✅ NOVA: Carregar todos os assuntos do curso de uma vez
+  const carregarTodosAssuntos = async (cursoId) => {
+    try {
+      // Buscar todas as disciplinas
+      const discRef = collection(db, `cursos/${cursoId}/disciplinas`);
+      const discQuery = query(discRef, orderBy('ordem', 'asc'));
+      const discSnapshot = await getDocs(discQuery);
+      
+      const todosAssuntos = [];
+      
+      // Para cada disciplina, buscar seus assuntos
+      for (const discDoc of discSnapshot.docs) {
+        const disciplinaId = discDoc.id;
+        const disciplinaData = discDoc.data();
+        const disciplinaNome = disciplinaData.nome || disciplinaData.titulo || '';
+        
+        const assuntosRef = collection(db, `cursos/${cursoId}/disciplinas/${disciplinaId}/assuntos`);
+        const assuntosQuery = query(assuntosRef, orderBy('ordem', 'asc'));
+        const assuntosSnapshot = await getDocs(assuntosQuery);
+        
+        assuntosSnapshot.forEach(assuntoDoc => {
+          const data = assuntoDoc.data();
+          if (!data.oculto) {
+            todosAssuntos.push({
+              id: assuntoDoc.id,
+              disciplinaId,
+              disciplinaNome,
+              ...data
+            });
+          }
+        });
+      }
+      
+      setAssuntos(todosAssuntos);
+    } catch (error) {
+      console.error('Erro ao carregar todos os assuntos:', error);
+    }
+  };
+
   const handleSelecionarDisciplina = async (disciplinaId) => {
-    setCarregando(true);
-    const novos = await carregarAssuntosDisciplina(cursoSelecionado, disciplinaId);
-    setAssuntos(prev => [...prev, ...novos]);
-    setCarregando(false);
+    // ✅ Apenas toggle expandir/colapsar (assuntos já foram carregados)
+    const jaExpandida = disciplinasExpandidas.includes(disciplinaId);
+    
+    if (jaExpandida) {
+      setDisciplinasExpandidas(prev => prev.filter(id => id !== disciplinaId));
+    } else {
+      setDisciplinasExpandidas(prev => [...prev, disciplinaId]);
+    }
   };
 
   const toggleAssunto = (assunto) => {
@@ -131,10 +249,18 @@ export const CriarMetas = () => {
       if (!novos.find(n => n.id === a.id)) novos.push(a);
     });
     setAssuntosSelecionados(novos);
+    
+    // ✅ NOVO: Feedback visual
+    setFeedbackBotao(`todos-${disciplinaId}`);
+    setTimeout(() => setFeedbackBotao(null), 500);
   };
 
   const desselecionarTodosDisciplina = (disciplinaId) => {
     setAssuntosSelecionados(prev => prev.filter(a => a.disciplinaId !== disciplinaId));
+    
+    // ✅ NOVO: Feedback visual
+    setFeedbackBotao(`limpar-${disciplinaId}`);
+    setTimeout(() => setFeedbackBotao(null), 500);
   };
 
   // ✅ Calcular distribuição automática
@@ -147,12 +273,24 @@ export const CriarMetas = () => {
     setCarregando(true);
     setErro('');
 
-    const resultado = distribuirMetasAutomaticamente({
+    const params = {
       assuntos: assuntosSelecionados,
       configuracoes: configAluno,
       dataInicio,
       tipoEstudo
-    });
+    };
+
+    // Adicionar restrições se ativas
+    if (usarRestricoes) {
+      if (maxDisciplinasPorDia) {
+        params.maxDisciplinasPorDia = parseInt(maxDisciplinasPorDia);
+      }
+      if (tempoMaxPorDisciplina) {
+        params.tempoMaxPorDisciplina = parseInt(tempoMaxPorDisciplina);
+      }
+    }
+
+    const resultado = distribuirMetasAutomaticamente(params);
 
     if (resultado.sucesso) {
       setDistribuicao(resultado.distribuicao);
@@ -202,8 +340,10 @@ export const CriarMetas = () => {
       alunoId: alunoSelecionado,
       cursoId: cursoSelecionado,
       disciplinaId: a.disciplinaId,
+      disciplinaNome: a.disciplinaNome || '', // ✅ ADICIONADO: Nome da disciplina
       assuntoId: a.id,
-      assuntoTitulo: a.titulo,
+      // ✅ MODIFICADO: Incluir nome da disciplina no título
+      assuntoTitulo: a.disciplinaNome ? `${a.disciplinaNome}: ${a.titulo}` : a.titulo,
       dataProgramada: dataInicio,
       tipoEstudo,
       tempoEstimado: a.tempos?.[tipoEstudo] || 60,
@@ -275,7 +415,7 @@ export const CriarMetas = () => {
                 <label className="block mb-2 text-sm font-medium text-gray-700">Aluno</label>
                 <select
                   value={alunoSelecionado || ''}
-                  onChange={(e) => setAlunoSelecionado(e.target.value)}
+                  onChange={(e) => handleSelecionarAluno(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione um aluno</option>
@@ -291,8 +431,8 @@ export const CriarMetas = () => {
                     📊 Disponibilidade de {nomeAluno}:
                   </p>
                   <div className="grid grid-cols-2 gap-3 text-sm text-blue-700">
-                    <div>📅 {configAluno.diasPorSemana} dias/semana</div>
-                    <div>⏰ {configAluno.horasPorDia}h/dia</div>
+                    <div>📅 {calcularDiasComHoras()} dias/semana</div>
+                    <div>⏰ {calcularTotalHorasSemana()}h total/semana</div>
                   </div>
                 </div>
               )}
@@ -326,7 +466,9 @@ export const CriarMetas = () => {
         {/* ETAPA 2 */}
         {etapa === 2 && (
           <div className="p-6 bg-white rounded-lg shadow">
-            <h2 className="mb-4 text-xl font-semibold text-gray-800">Selecione os Assuntos</h2>
+            <h2 className="mb-4 text-xl font-semibold text-gray-800">
+              Selecione os Assuntos ({assuntosSelecionados.length} selecionados)
+            </h2>
 
             {carregando ? (
               <div className="py-8 text-center">
@@ -334,62 +476,94 @@ export const CriarMetas = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {disciplinas.map(d => (
-                  <div key={d.id} className="border border-gray-200 rounded-lg">
-                    <div className="flex items-center justify-between p-4">
-                      <button
-                        onClick={() => handleSelecionarDisciplina(d.id)}
-                        className="flex-1 font-medium text-left text-gray-800"
-                      >
-                        {d.nome} <span className="text-sm text-gray-500">({d.totalAssuntos})</span>
-                      </button>
-                      <div className="flex gap-2">
+                {disciplinas.map(d => {
+                  const expandida = disciplinasExpandidas.includes(d.id);
+                  const assuntosDaDisciplina = assuntos.filter(a => a.disciplinaId === d.id);
+                  const selecionadosDaDisciplina = assuntosDaDisciplina.filter(a => 
+                    assuntosSelecionados.find(s => s.id === a.id)
+                  ).length;
+                  
+                  return (
+                    <div key={d.id} className="overflow-hidden border border-gray-200 rounded-lg">
+                      {/* Header da Disciplina */}
+                      <div className="flex items-center justify-between p-4 bg-gray-50">
                         <button
-                          onClick={() => selecionarTodosDisciplina(d.id)}
-                          className="px-3 py-1 text-xs text-green-700 bg-green-100 rounded hover:bg-green-200"
+                          onClick={() => handleSelecionarDisciplina(d.id)}
+                          className="flex items-center flex-1 gap-2 font-medium text-left text-gray-800 hover:text-blue-600"
                         >
-                          ☑️ Todos
+                          <span className="text-lg">
+                            {expandida ? '▼' : '▶'}
+                          </span>
+                          <span>{d.nome}</span>
+                          <span className="text-sm text-gray-500">
+                            ({selecionadosDaDisciplina}/{assuntosDaDisciplina.length})
+                          </span>
                         </button>
-                        <button
-                          onClick={() => desselecionarTodosDisciplina(d.id)}
-                          className="px-3 py-1 text-xs text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-                        >
-                          ☐ Limpar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {assuntos.length > 0 && (
-              <div className="mt-6">
-                <h3 className="mb-3 font-semibold text-gray-800">
-                  Assuntos ({assuntosSelecionados.length} selecionados)
-                </h3>
-                <div className="space-y-2 overflow-y-auto max-h-96">
-                  {assuntos.map(a => {
-                    const sel = assuntosSelecionados.find(s => s.id === a.id);
-                    return (
-                      <div
-                        key={a.id}
-                        onClick={() => toggleAssunto(a)}
-                        className={`p-3 rounded-lg border cursor-pointer ${
-                          sel ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input type="checkbox" checked={!!sel} readOnly className="w-4 h-4" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{a.titulo}</p>
-                            <p className="text-xs text-gray-500">Regular: {a.tempos?.regular || 0}min</p>
-                          </div>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selecionarTodosDisciplina(d.id);
+                            }}
+                            className={`px-3 py-1 text-xs rounded transition-all ${
+                              feedbackBotao === `todos-${d.id}`
+                                ? 'bg-green-600 text-white scale-110'
+                                : 'text-green-700 bg-green-100 hover:bg-green-200'
+                            }`}
+                          >
+                            ☑️ Todos
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              desselecionarTodosDisciplina(d.id);
+                            }}
+                            className={`px-3 py-1 text-xs rounded transition-all ${
+                              feedbackBotao === `limpar-${d.id}`
+                                ? 'bg-red-600 text-white scale-110'
+                                : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                            }`}
+                          >
+                            ☐ Limpar
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* Assuntos (expandidos) */}
+                      {expandida && assuntosDaDisciplina.length > 0 && (
+                        <div className="p-3 space-y-2 bg-white border-t">
+                          {assuntosDaDisciplina.map(a => {
+                            const sel = assuntosSelecionados.find(s => s.id === a.id);
+                            return (
+                              <div
+                                key={a.id}
+                                onClick={() => toggleAssunto(a)}
+                                className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                                  sel 
+                                    ? 'bg-blue-50 border-blue-300 shadow-sm' 
+                                    : 'bg-white border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <input type="checkbox" checked={!!sel} readOnly className="w-4 h-4" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-800">{a.titulo}</p>
+                                    <p className="text-xs text-gray-500">
+                                      Expresso: {a.tempos?.expresso || 0}min • 
+                                      Regular: {a.tempos?.regular || 0}min • 
+                                      Calma: {a.tempos?.calma || 0}min
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -422,8 +596,8 @@ export const CriarMetas = () => {
               <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
                 <div>• Aluno: <strong>{nomeAluno}</strong></div>
                 <div>• Assuntos: <strong>{assuntosSelecionados.length}</strong></div>
-                <div>• Disponibilidade: <strong>{configAluno?.diasPorSemana} dias/sem</strong></div>
-                <div>• Tempo/dia: <strong>{configAluno?.horasPorDia}h</strong></div>
+                <div>• Disponibilidade: <strong>{calcularDiasComHoras()} dias/sem</strong></div>
+                <div>• Total semanal: <strong>{calcularTotalHorasSemana()}h</strong></div>
               </div>
             </div>
 
@@ -497,6 +671,87 @@ export const CriarMetas = () => {
                 />
               </div>
 
+              {/* MODO AUTOMÁTICO - Restrições Avançadas */}
+              {modoDistribuicao === 'automatico' && (
+                <div className="p-4 border border-purple-200 rounded-lg bg-purple-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="flex items-center gap-2 text-sm font-medium text-purple-900 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={usarRestricoes}
+                        onChange={(e) => {
+                          setUsarRestricoes(e.target.checked);
+                          setMostrarPreview(false);
+                        }}
+                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      ⚙️ Configurações Avançadas de Distribuição
+                    </label>
+                  </div>
+
+                  {usarRestricoes && (
+                    <div className="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
+                      {/* Max Disciplinas por Dia */}
+                      <div>
+                        <label className="block mb-2 text-sm font-medium text-purple-900">
+                          📚 Máx. disciplinas diferentes/dia
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={maxDisciplinasPorDia || ''}
+                            onChange={(e) => {
+                              setMaxDisciplinasPorDia(e.target.value ? parseInt(e.target.value) : null);
+                              setMostrarPreview(false);
+                            }}
+                            placeholder="Ilimitado"
+                            className="flex-1 px-3 py-2 text-sm border border-purple-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                          <span className="text-xs text-purple-700">disciplinas</span>
+                        </div>
+                        <p className="mt-1 text-xs text-purple-600">
+                          Ex: 3 = no máximo 3 disciplinas diferentes por dia
+                        </p>
+                      </div>
+
+                      {/* Tempo Máximo por Disciplina */}
+                      <div>
+                        <label className="block mb-2 text-sm font-medium text-purple-900">
+                          ⏱️ Tempo máx. por disciplina/dia
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="15"
+                            max="240"
+                            step="15"
+                            value={tempoMaxPorDisciplina || ''}
+                            onChange={(e) => {
+                              setTempoMaxPorDisciplina(e.target.value ? parseInt(e.target.value) : null);
+                              setMostrarPreview(false);
+                            }}
+                            placeholder="Ilimitado"
+                            className="flex-1 px-3 py-2 text-sm border border-purple-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                          <span className="text-xs text-purple-700">minutos</span>
+                        </div>
+                        <p className="mt-1 text-xs text-purple-600">
+                          Ex: 60 = cada disciplina no máximo 1h por dia
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!usarRestricoes && (
+                    <p className="text-xs text-purple-600">
+                      💡 Sem restrições: distribuição otimizada pelo tempo disponível
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* MODO AUTOMÁTICO */}
               {modoDistribuicao === 'automatico' && (
                 <>
@@ -547,10 +802,17 @@ export const CriarMetas = () => {
                             
                             <div className="mt-2 space-y-1">
                               {dia.assuntos.map((a, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                                  <span>•</span>
-                                  <span className="flex-1">{a.titulo}</span>
-                                  <span className="text-gray-500">{a.tempoEstimado}min</span>
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                  <span className="text-gray-400">•</span>
+                                  <span className="flex-1">
+                                    {a.disciplinaNome && (
+                                      <span className="font-semibold text-blue-700">
+                                        {a.disciplinaNome}:{' '}
+                                      </span>
+                                    )}
+                                    <span className="text-gray-800">{a.titulo}</span>
+                                  </span>
+                                  <span className="text-xs text-gray-500">{a.tempoEstimado}min</span>
                                 </div>
                               ))}
                             </div>

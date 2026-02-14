@@ -26,6 +26,22 @@ export const AlunoDashboard = () => {
   const [metaSelecionada, setMetaSelecionada] = useState(null);
   const [mostrarModal, setMostrarModal] = useState(false);
   
+  // ✅ NOVOS: Estados para organização de metas
+  const [secoesExpandidas, setSecoesExpandidas] = useState({
+    atrasadas: true,
+    hoje: true,
+    amanha: true,
+    semana: true,
+    futuro: false
+  });
+  const [limitePorSecao, setLimitePorSecao] = useState({
+    atrasadas: 5,
+    hoje: 10,
+    amanha: 5,
+    semana: 5,
+    futuro: 5
+  });
+  
   const [statsMetas, setStatsMetas] = useState({
     total: 0,
     concluidas: 0,
@@ -104,6 +120,68 @@ export const AlunoDashboard = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  // ✅ NOVAS: Funções para organização de metas
+  const toggleSecao = (secao) => {
+    setSecoesExpandidas(prev => ({
+      ...prev,
+      [secao]: !prev[secao]
+    }));
+  };
+
+  const verMais = (secao) => {
+    setLimitePorSecao(prev => ({
+      ...prev,
+      [secao]: prev[secao] + 10
+    }));
+  };
+
+  const agruparMetasPorPeriodo = (metas) => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    
+    const fimSemana = new Date(hoje);
+    fimSemana.setDate(fimSemana.getDate() + 7);
+
+    const grupos = {
+      atrasadas: [],
+      hoje: [],
+      amanha: [],
+      semana: [],
+      futuro: []
+    };
+
+    metas.forEach(meta => {
+      const dataMeta = meta.dataProgramada.toDate();
+      dataMeta.setHours(0, 0, 0, 0);
+
+      if (!meta.concluida && dataMeta < hoje) {
+        grupos.atrasadas.push(meta);
+      } else if (dataMeta.getTime() === hoje.getTime()) {
+        grupos.hoje.push(meta);
+      } else if (dataMeta.getTime() === amanha.getTime()) {
+        grupos.amanha.push(meta);
+      } else if (dataMeta > amanha && dataMeta <= fimSemana) {
+        grupos.semana.push(meta);
+      } else {
+        grupos.futuro.push(meta);
+      }
+    });
+
+    // ✅ NOVO: Ordenar cada grupo por data (mais recente primeiro)
+    Object.keys(grupos).forEach(chave => {
+      grupos[chave].sort((a, b) => {
+        const dataA = a.dataProgramada.toDate();
+        const dataB = b.dataProgramada.toDate();
+        return dataA - dataB; // Crescente (mais próximo primeiro)
+      });
+    });
+
+    return grupos;
   };
 
   const formatarData = (timestamp) => {
@@ -208,6 +286,13 @@ export const AlunoDashboard = () => {
             <span>⚙️</span>
             <span>Configurar Estudo</span>
           </Link>
+          <button 
+            onClick={() => navigate(`/aluno/otimizar-cronograma`)}
+            className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-white transition bg-purple-600 rounded-lg hover:bg-purple-700"
+          >
+            <span>🔄</span>
+            <span>Otimizar Cronograma</span>
+          </button>
           {statsFlashcards.paraRevisar > 0 && (
             <button
               onClick={() => navigate('/aluno/flashcards/revisar')}
@@ -312,13 +397,17 @@ export const AlunoDashboard = () => {
                   className="flex items-center gap-3 p-3 transition bg-white rounded-lg cursor-pointer hover:shadow-md"
                   onClick={() => handleAbrirModal(meta)}
                 >
-                  <input
-                    type="checkbox"
-                    checked={meta.concluida}
-                    onChange={(e) => handleToggleMeta(meta.id, meta.concluida, e)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-5 h-5 cursor-pointer"
-                  />
+                  {/* ✅ Indicador visual (não clicável) */}
+                  <div className="flex-shrink-0">
+                    {meta.concluida ? (
+                      <span className="flex items-center justify-center w-5 h-5 text-white bg-green-600 rounded-full">
+                        ✓
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center w-5 h-5 border-2 border-gray-400 rounded-full">
+                      </span>
+                    )}
+                  </div>
                   <div className="flex-1">
                     <span className={`${meta.concluida ? 'line-through text-gray-500' : 'text-gray-800'}`}>
                       {meta.assuntoTitulo || meta.assuntoId}
@@ -347,7 +436,7 @@ export const AlunoDashboard = () => {
           </div>
         )}
 
-        {/* Filtros e Lista de Metas */}
+        {/* Filtros e Lista de Metas ORGANIZADA */}
         <div className="mb-6 bg-white rounded-lg shadow">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-800">Minhas Metas</h2>
@@ -396,91 +485,197 @@ export const AlunoDashboard = () => {
                 <p className="text-gray-600">Nenhuma meta encontrada</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {metasFiltradas.map(meta => {
-                  const hoje = new Date();
-                  hoje.setHours(0, 0, 0, 0);
-                  const dataMeta = meta.dataProgramada.toDate();
-                  dataMeta.setHours(0, 0, 0, 0);
-                  const atrasada = !meta.concluida && dataMeta < hoje;
+              <div>
+                {(() => {
+                  const grupos = agruparMetasPorPeriodo(metasFiltradas);
+                  
+                  // ✅ Componente de renderização de seção
+                  const RenderSecao = ({ titulo, icone, metas, secao, cor }) => {
+                    if (metas.length === 0) return null;
 
-                  return (
-                    <div
-                      key={meta.id}
-                      onClick={() => handleAbrirModal(meta)}
-                      className={`border rounded-lg p-4 transition cursor-pointer ${
-                        meta.concluida
-                          ? 'bg-green-50 border-green-200'
-                          : atrasada
-                          ? 'bg-red-50 border-red-200'
-                          : 'bg-white border-gray-200 hover:shadow-md'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={meta.concluida}
-                          onChange={(e) => handleToggleMeta(meta.id, meta.concluida, e)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-5 h-5 mt-1 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className={`font-medium ${
-                                  meta.concluida ? 'text-green-700 line-through' : 'text-gray-800'
-                                }`}>
-                                  {meta.assuntoTitulo || meta.assuntoId}
-                                </p>
-                                {meta.status && meta.status !== 'Pendente' && (
-                                  <span className={`px-2 py-1 text-xs rounded-full ${
-                                    meta.status === 'Com dúvida' ? 'bg-yellow-100 text-yellow-700' :
-                                    meta.status === 'Em andamento' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-gray-100 text-gray-700'
-                                  }`}>
-                                    {meta.status === 'Com dúvida' && '❓'}
-                                    {meta.status === 'Em andamento' && '🔄'}
-                                    {' '}{meta.status}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex gap-3 mt-1 text-sm text-gray-600">
-                                <span>📅 {formatarData(meta.dataProgramada)}</span>
-                                <span>⏱ {meta.tempoEstimado} min</span>
-                                <span className="capitalize">📚 {meta.tipoEstudo}</span>
-                              </div>
-                              {meta.observacoes && (
-                                <p className="mt-2 text-sm text-gray-600">{meta.observacoes}</p>
-                              )}
+                    const expandida = secoesExpandidas[secao];
+                    const limite = limitePorSecao[secao];
+                    const metasVisiveis = metas.slice(0, limite);
+                    const temMais = metas.length > limite;
+
+                    return (
+                      <div className="mb-4">
+                        {/* Header da Seção */}
+                        <button
+                          onClick={() => toggleSecao(secao)}
+                          className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition ${
+                            cor === 'red' ? 'bg-red-50 border-red-200 hover:bg-red-100' :
+                            cor === 'blue' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
+                            cor === 'orange' ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' :
+                            cor === 'purple' ? 'bg-purple-50 border-purple-200 hover:bg-purple-100' :
+                            'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{icone}</span>
+                            <div className="text-left">
+                              <h3 className={`font-semibold ${
+                                cor === 'red' ? 'text-red-800' :
+                                cor === 'blue' ? 'text-blue-800' :
+                                cor === 'orange' ? 'text-orange-800' :
+                                cor === 'purple' ? 'text-purple-800' :
+                                'text-gray-800'
+                              }`}>
+                                {titulo}
+                              </h3>
+                              <p className="text-sm text-gray-600">
+                                {metas.filter(m => !m.concluida).length} pendentes • {metas.filter(m => m.concluida).length} concluídas
+                              </p>
                             </div>
-                            {meta.concluida ? (
-                              <span className="px-2 py-1 text-xs text-white bg-green-600 rounded-full">
-                                ✓ Concluída
-                              </span>
-                            ) : atrasada ? (
-                              <span className="px-2 py-1 text-xs text-white bg-red-600 rounded-full">
-                                🚨 Atrasada
-                              </span>
-                            ) : null}
                           </div>
-                        </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                              cor === 'red' ? 'bg-red-200 text-red-800' :
+                              cor === 'blue' ? 'bg-blue-200 text-blue-800' :
+                              cor === 'orange' ? 'bg-orange-200 text-orange-800' :
+                              cor === 'purple' ? 'bg-purple-200 text-purple-800' :
+                              'bg-gray-200 text-gray-800'
+                            }`}>
+                              {metas.length}
+                            </span>
+                            <svg 
+                              className={`w-5 h-5 transition-transform ${expandida ? 'rotate-180' : ''}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+
+                        {/* Lista de Metas */}
+                        {expandida && (
+                          <div className="mt-2 space-y-2">
+                            {metasVisiveis.map(meta => {
+                              const hoje = new Date();
+                              hoje.setHours(0, 0, 0, 0);
+                              const dataMeta = meta.dataProgramada.toDate();
+                              dataMeta.setHours(0, 0, 0, 0);
+                              const atrasada = !meta.concluida && dataMeta < hoje;
+
+                              return (
+                                <div
+                                  key={meta.id}
+                                  onClick={() => handleAbrirModal(meta)}
+                                  className={`border rounded-lg p-3 transition cursor-pointer ${
+                                    meta.concluida
+                                      ? 'bg-green-50 border-green-200'
+                                      : atrasada
+                                      ? 'bg-red-50 border-red-200'
+                                      : 'bg-white border-gray-200 hover:shadow-md'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {/* ✅ Indicador visual (não clicável) */}
+                                    <div className="flex-shrink-0 mt-0.5">
+                                      {meta.concluida ? (
+                                        <span className="flex items-center justify-center w-5 h-5 text-white bg-green-600 rounded-full">
+                                          ✓
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center justify-center w-5 h-5 border-2 border-gray-400 rounded-full">
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className={`font-medium text-sm ${
+                                        meta.concluida ? 'text-green-700 line-through' : 'text-gray-800'
+                                      }`}>
+                                        {meta.assuntoTitulo || meta.assuntoId}
+                                      </p>
+                                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-600">
+                                        <span className="flex items-center gap-1">
+                                          📅 {formatarData(meta.dataProgramada)}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          ⏱ {meta.tempoEstimado} min
+                                        </span>
+                                        <span className="flex items-center gap-1 capitalize">
+                                          📚 {meta.tipoEstudo}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {/* Botão Ver Mais */}
+                            {temMais && (
+                              <button
+                                onClick={() => verMais(secao)}
+                                className="w-full py-2 text-sm font-medium text-blue-600 transition border border-blue-200 rounded-lg hover:bg-blue-50"
+                              >
+                                Ver mais {metas.length - limite} metas ▼
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    );
+                  };
+                  
+                  return (
+                    <>
+                      <RenderSecao 
+                        titulo="🚨 Atrasadas"
+                        icone="🔴"
+                        metas={grupos.atrasadas}
+                        secao="atrasadas"
+                        cor="red"
+                      />
+                      
+                      <RenderSecao 
+                        titulo="⚡ Hoje"
+                        icone="📍"
+                        metas={grupos.hoje}
+                        secao="hoje"
+                        cor="blue"
+                      />
+                      
+                      <RenderSecao 
+                        titulo="📅 Amanhã"
+                        icone="➡️"
+                        metas={grupos.amanha}
+                        secao="amanha"
+                        cor="orange"
+                      />
+                      
+                      <RenderSecao 
+                        titulo="📆 Esta Semana"
+                        icone="📊"
+                        metas={grupos.semana}
+                        secao="semana"
+                        cor="purple"
+                      />
+                      
+                      <RenderSecao 
+                        titulo="🔮 Futuro"
+                        icone="🗓️"
+                        metas={grupos.futuro}
+                        secao="futuro"
+                        cor="gray"
+                      />
+                    </>
                   );
-                })}
+                })()}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Modal de Comentários */}
+      {/* Modal */}
       {mostrarModal && metaSelecionada && (
         <ModalMetaComComentarios
           meta={metaSelecionada}
           onClose={handleFecharModal}
-          onAtualizar={carregarDados}
         />
       )}
     </div>

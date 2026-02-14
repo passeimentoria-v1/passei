@@ -6,22 +6,23 @@ import { db } from '../firebase.config';
  */
 export const atualizarConfiguracoesEstudo = async (userId, configuracoes) => {
   try {
+    console.log('💾 Salvando configurações para userId:', userId);
+    console.log('📝 Dados a salvar:', configuracoes);
+    
     const userRef = doc(db, 'users', userId);
     
-    const configUpdate = {
-      'configuracoesEstudo.diasPorSemana': parseInt(configuracoes.diasPorSemana) || 5,
-      'configuracoesEstudo.horasPorDia': parseFloat(configuracoes.horasPorDia) || 4,
-      'configuracoesEstudo.tempoPorDisciplina': parseInt(configuracoes.tempoPorDisciplina) || 60,
-      'configuracoesEstudo.disciplinasPorDia': parseInt(configuracoes.disciplinasPorDia) || 3
-    };
+    // Salvar o objeto completo de configurações
+    await updateDoc(userRef, {
+      configuracoesEstudo: configuracoes
+    });
 
-    await updateDoc(userRef, configUpdate);
+    console.log('✅ Configurações salvas com sucesso');
 
     return {
       sucesso: true
     };
   } catch (error) {
-    console.error('Erro ao atualizar configurações:', error);
+    console.error('❌ Erro ao atualizar configurações:', error);
     return {
       sucesso: false,
       erro: 'Erro ao atualizar configurações'
@@ -34,10 +35,13 @@ export const atualizarConfiguracoesEstudo = async (userId, configuracoes) => {
  */
 export const buscarConfiguracoesEstudo = async (userId) => {
   try {
+    console.log('🔍 Buscando configurações para userId:', userId);
+    
     const userRef = doc(db, 'users', userId);
     const userSnap = await getDoc(userRef);
     
     if (!userSnap.exists()) {
+      console.log('⚠️ Usuário não encontrado');
       return {
         sucesso: false,
         erro: 'Usuário não encontrado'
@@ -45,19 +49,57 @@ export const buscarConfiguracoesEstudo = async (userId) => {
     }
     
     const userData = userSnap.data();
-    const configuracoes = userData.configuracoesEstudo || {
-      diasPorSemana: 5,
-      horasPorDia: 4,
-      tempoPorDisciplina: 60,
-      disciplinasPorDia: 3
+    console.log('📦 Dados do usuário:', userData);
+    
+    // Se não tiver configurações, retorna null para usar valores padrão no componente
+    if (!userData.configuracoesEstudo) {
+      console.log('ℹ️ Nenhuma configuração encontrada');
+      return {
+        sucesso: true,
+        configuracoes: null
+      };
+    }
+    
+    const configuracoes = userData.configuracoesEstudo;
+    
+    // Verificar se está no formato novo (objeto com dias da semana)
+    if (configuracoes.horasPorDia && typeof configuracoes.horasPorDia === 'object' && 
+        configuracoes.horasPorDia.segunda !== undefined) {
+      console.log('✅ Formato novo detectado');
+      
+      // Remover diasPorSemana se existir (campo obsoleto)
+      const { diasPorSemana, tempoPorDisciplina, disciplinasPorDia, ...configLimpa } = configuracoes;
+      
+      return {
+        sucesso: true,
+        configuracoes: configLimpa
+      };
+    }
+    
+    // Formato antigo - migrar automaticamente
+    console.log('⚠️ Formato antigo detectado, migrando...');
+    const horasDefault = typeof configuracoes.horasPorDia === 'number' 
+      ? configuracoes.horasPorDia 
+      : 4;
+    
+    const configMigradas = {
+      horasPorDia: {
+        segunda: horasDefault,
+        terca: horasDefault,
+        quarta: horasDefault,
+        quinta: horasDefault,
+        sexta: horasDefault,
+        sabado: 0,
+        domingo: 0
+      }
     };
     
     return {
       sucesso: true,
-      configuracoes
+      configuracoes: configMigradas
     };
   } catch (error) {
-    console.error('Erro ao buscar configurações:', error);
+    console.error('❌ Erro ao buscar configurações:', error);
     return {
       sucesso: false,
       erro: 'Erro ao buscar configurações'
@@ -83,6 +125,32 @@ export const vincularAlunoACurso = async (alunoId, cursoId) => {
     return {
       sucesso: false,
       erro: 'Erro ao vincular aluno'
+    };
+  }
+};
+
+/**
+ * ✅ NOVO: Alternar status do usuário (ativo/inativo)
+ */
+export const alternarStatusUsuario = async (userId, ativoAtual) => {
+  try {
+    const novoStatus = !ativoAtual;
+    console.log(`🔄 Alterando status para: ${novoStatus ? 'ATIVO' : 'INATIVO'}`);
+    
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      ativo: novoStatus
+    });
+
+    return {
+      sucesso: true,
+      novoStatus
+    };
+  } catch (error) {
+    console.error('❌ Erro ao alternar status:', error);
+    return {
+      sucesso: false,
+      erro: 'Erro ao alternar status do usuário'
     };
   }
 };

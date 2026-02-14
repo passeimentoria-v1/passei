@@ -38,7 +38,10 @@ export const criarMeta = async (dadosMeta) => {
       dataConclusao: null,
       status: 'Pendente',
       criadoPor: dadosMeta.mentorId,
-      dataCriacao: Timestamp.now()
+      dataCriacao: Timestamp.now(),
+      // ✅ NOVOS: Campos para controlar visibilidade
+      oculto: false,
+      arquivado: false
     };
 
     const docRef = await addDoc(metasRef, metaData);
@@ -82,6 +85,7 @@ export const criarMetasEmLote = async (metas) => {
 
 /**
  * Buscar metas de um aluno por período
+ * ✅ ATUALIZADO: Filtra metas ocultas e arquivadas
  */
 export const buscarMetasPorPeriodo = async (alunoId, dataInicio, dataFim) => {
   try {
@@ -95,10 +99,14 @@ export const buscarMetasPorPeriodo = async (alunoId, dataInicio, dataFim) => {
     );
 
     const snapshot = await getDocs(q);
-    const metas = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    
+    // ✅ NOVO: Filtrar metas ocultas e arquivadas no lado do cliente
+    const metas = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(meta => !meta.oculto && !meta.arquivado);
 
     return {
       sucesso: true,
@@ -116,6 +124,7 @@ export const buscarMetasPorPeriodo = async (alunoId, dataInicio, dataFim) => {
 
 /**
  * Buscar metas por mês (para calendário)
+ * ✅ ATUALIZADO: Filtra metas ocultas e arquivadas
  */
 export const buscarMetasPorMes = async (alunoId, mes, ano) => {
   try {
@@ -132,10 +141,14 @@ export const buscarMetasPorMes = async (alunoId, mes, ano) => {
     );
 
     const snapshot = await getDocs(q);
-    const metas = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    
+    // ✅ NOVO: Filtrar metas ocultas e arquivadas no lado do cliente
+    const metas = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(meta => !meta.oculto && !meta.arquivado);
 
     return {
       sucesso: true,
@@ -153,6 +166,7 @@ export const buscarMetasPorMes = async (alunoId, mes, ano) => {
 
 /**
  * Buscar todas as metas de um aluno
+ * ✅ ATUALIZADO: Filtra metas ocultas e arquivadas
  */
 export const buscarMetasAluno = async (alunoId) => {
   try {
@@ -164,10 +178,14 @@ export const buscarMetasAluno = async (alunoId) => {
     );
 
     const snapshot = await getDocs(q);
-    const metas = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    
+    // ✅ NOVO: Filtrar metas ocultas e arquivadas no lado do cliente
+    const metas = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(meta => !meta.oculto && !meta.arquivado);
 
     return {
       sucesso: true,
@@ -460,6 +478,7 @@ export const buscarEstatisticasPorPeriodo = async (alunoId, dataInicio, dataFim)
 
 /**
  * Buscar metas atrasadas de um aluno (NOVA FUNCIONALIDADE)
+ * ✅ ATUALIZADO: Filtra metas ocultas e arquivadas
  */
 export const buscarMetasAtrasadas = async (alunoId) => {
   try {
@@ -478,6 +497,11 @@ export const buscarMetasAtrasadas = async (alunoId) => {
     const metasAtrasadas = [];
     snapshot.forEach((doc) => {
       const meta = { id: doc.id, ...doc.data() };
+      
+      // ✅ NOVO: Ignorar metas ocultas e arquivadas
+      if (meta.oculto || meta.arquivado) {
+        return;
+      }
       
       if (meta.dataProgramada) {
         const dataProgramada = meta.dataProgramada.toDate();

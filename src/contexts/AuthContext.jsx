@@ -33,6 +33,18 @@ export const AuthProvider = ({ children }) => {
           
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            
+            // ✅ NOVO: Verificar se o usuário está ativo
+            if (userData.ativo === false) {
+              console.warn('⚠️ Usuário inativo tentando acessar:', user.email);
+              // Fazer logout automático
+              await auth.signOut();
+              setUsuario(null);
+              setErro('Sua conta está desativada. Entre em contato com seu mentor.');
+              setCarregando(false);
+              return;
+            }
+            
             setUsuario({
               uid: user.uid,
               email: user.email,
@@ -40,7 +52,7 @@ export const AuthProvider = ({ children }) => {
               tipo: userData.tipo,
               fotoPerfil: userData.fotoPerfil || user.photoURL,
               mentorId: userData.mentorId || null,
-              ativo: userData.ativo
+              ativo: userData.ativo !== false // Default true se não existir
             });
           } else {
             setUsuario(null);
